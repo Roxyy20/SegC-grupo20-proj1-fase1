@@ -97,8 +97,48 @@ public class SpertaClient {
   }
 
     private static String sendCommand(String[] parts) throws IOException {
-      for (String part : parts) {
-        outStream.writeUTF(part);
+      String command = parts[0];
+      Command cmdEnum = Command.fromString(command);
+      if (cmdEnum == null) {
+        System.out.println("Comando não existe");
+        return null;
+      }
+      if (cmdEnum == Command.CREATE && parts.length != 2) {
+        System.out.println("Comando CREATE requer 1 argumento: <hm> ");
+        return null;
+      }
+      else if (cmdEnum == Command.ADD && parts.length != 4) {
+        System.out.println("Comando ADD requer 3 argumentos: <user1> <hm> <s>");
+        return null;
+      }
+      else if (cmdEnum == Command.EC && parts.length != 4) {
+        System.out.println("Comando EC requer 4 argumentos: <hm>  <d>  <int>");
+        return null;
+      }
+      else if (cmdEnum == Command.RT && parts.length != 2) {
+        System.out.println("Comando RT requer 1 argumento: <hm>");
+        return null;
+      }
+      else if (cmdEnum == Command.RH && parts.length != 3) {
+        System.out.println("Comando RH requer 2 argumentos: <hm> <d>");
+        return null;
+      }
+      else if (cmdEnum == Command.RD && parts.length != 3) {
+        System.out.println("Comando RD requer 2 argumentos: <hm> <s>");
+        return null;
+      }
+      if(cmdEnum == Command.EC){
+        String hm = parts[1];
+        String d = parts[2];
+        int intValue = Integer.parseInt(parts[3]);
+        outStream.writeUTF(hm);
+        outStream.writeUTF(d);
+        outStream.writeInt(intValue);
+      }
+      else {
+        for (String part : parts) {
+          outStream.writeUTF(part);
+        }
       }
       outStream.flush();
       return inStream.readUTF();
