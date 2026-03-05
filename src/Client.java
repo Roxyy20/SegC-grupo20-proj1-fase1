@@ -1,4 +1,6 @@
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.net.Socket;
 
 public class Client {
@@ -21,8 +23,12 @@ public class Client {
       }
     }
 
-    try (Socket clienSocket = new Socket(address, port)) {
+    try (Socket clientSocket = new Socket(address, port)) {
       System.out.println("Connected");
+      ObjectOutputStream outStream = new ObjectOutputStream(clientSocket.getOutputStream());
+      outStream.flush();
+      ObjectInputStream inStream = new ObjectInputStream(clientSocket.getInputStream());
+
     } catch (IOException e) {
       e.printStackTrace();
     }
