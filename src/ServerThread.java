@@ -8,11 +8,9 @@ import java.net.Socket;
 
 class ServerThread extends Thread {
   private Socket socket = null;
-  private SpertaServer server;
 
-  ServerThread(SpertaServer server, Socket inSoc) {
-    this.server = server;
-    this.socket = inSoc;
+  ServerThread(Socket inSoc) {
+    socket = inSoc;
     System.out.println("Thread started for new client");
   }
 
