@@ -1,2 +1,2 @@
-rm src/*.class
+rm src/*.class > /dev/null
 javac src/*.java

@@ -22,7 +22,7 @@ to run the server:
   ./SpertaServer.sh [<port>]
   ```
 
-## Building
+## Running Client
 
 to run the client:
 - Build the project
