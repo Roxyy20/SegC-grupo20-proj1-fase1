@@ -44,7 +44,7 @@ class ServerThread extends Thread {
             outStream.writeObject(LoginMessage.WrongPassword);
             outStream.flush();
             buffReader.close();
-            return;
+            readNewPassword(outStream, inStream, password);
           }
           break;
         }
@@ -102,6 +102,25 @@ class ServerThread extends Thread {
       }
     } catch (IOException e) {
       e.printStackTrace();
+    }
+  }
+
+  private void readNewPassword(ObjectOutputStream outStream, ObjectInputStream inStream, String pass) throws IOException {
+    while (true) {
+      String newPass = inStream.readUTF();
+      System.out.println("Received new password: " + newPass + " password: " + pass);
+      System.out.println(newPass.equals(pass));
+      if(!newPass.equals(pass)){
+        System.out.println("Wrong password. Entrou no if");
+        outStream.writeObject(LoginMessage.WrongPassword);
+        outStream.flush();
+      }
+      else if (newPass.equals(pass)){
+        System.out.println("Password correct. Entrou no else");
+        outStream.writeObject(LoginMessage.OKUser);
+        outStream.flush();
+        break;
+      }
     }
   }
 

@@ -50,6 +50,7 @@ public class SpertaClient {
       switch (msg) {
         case WrongPassword:
           System.out.println("Wrong password");
+          tryNewPassword();
           break;
         case OKNewUser:
           System.out.println("Ok. You are a new user");
@@ -142,6 +143,30 @@ public class SpertaClient {
       }
       outStream.flush();
       return inStream.readUTF();
+    }
+
+    private static void tryNewPassword() throws IOException {
+      Scanner sc = new Scanner(System.in);
+      while (true) {
+        System.out.print("Enter new password: ");
+        String newPassword = sc.nextLine();
+        outStream.writeUTF(newPassword);
+        outStream.flush();
+        LoginMessage msg;
+        try {
+          msg = (LoginMessage) inStream.readObject();
+        } catch (ClassNotFoundException e) {
+          e.printStackTrace();
+          return;
+        }
+        if (msg == LoginMessage.WrongPassword) {
+          System.out.println("Wrong password.");
+        } else {
+          break;
+        }
+     }
+      printhelp();
+      readCommands();
     }
   
 }
