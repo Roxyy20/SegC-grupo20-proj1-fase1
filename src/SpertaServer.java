@@ -2,7 +2,7 @@ import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 
-public class Server {
+public class SpertaServer {
   public static void main(String[] args) {
     if (args.length > 1) {
       System.err.println("Wrong argument count. Usage: SpertaServer <port>");
@@ -17,13 +17,13 @@ public class Server {
       }
     }
     System.out.format("Starting server at port %s\n", port);
-    Server server = new Server(port);
+    SpertaServer server = new SpertaServer(port);
     server.start();
   }
 
   private int port;
 
-  Server(int port) {
+  SpertaServer(int port) {
     this.port = port;
   }
 
