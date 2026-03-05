@@ -89,7 +89,7 @@ public class SpertaClient {
     Scanner sc = new Scanner(System.in);
     boolean running = true;
     while (running) {
-      System.out.print("Ação pretendida:");
+      System.out.print("Ação pretendida: ");
       String[] mensagem = sc.nextLine().split(" ");
       sendCommand(mensagem);
     }
