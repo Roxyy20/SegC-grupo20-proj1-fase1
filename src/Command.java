@@ -4,5 +4,13 @@ public enum Command {
   RD,
   EC,
   RT,
-  RH
+  RH;
+
+  public static Command fromString(String text) {
+        try {
+            return Command.valueOf(text.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return null; // Comando não existe
+        }
+    }
 }

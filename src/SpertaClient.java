@@ -2,8 +2,13 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
+import java.util.Scanner;
 
 public class SpertaClient {
+  // streams used for sending commands to the server
+  private static ObjectOutputStream outStream;
+  private static ObjectInputStream inStream;
+
   public static void main(String[] args) {
     if (args.length != 3) {
       System.err.println("Wrong argument count. Usage: SpertaClient <serverAddress> <user-id> <pass>");
@@ -25,10 +30,12 @@ public class SpertaClient {
 
     try (Socket clientSocket = new Socket(address, port)) {
       System.out.println("Connected");
-      ObjectOutputStream outStream = new ObjectOutputStream(clientSocket.getOutputStream());
+      // assign to static fields so other methods can use them
+      outStream = new ObjectOutputStream(clientSocket.getOutputStream());
       outStream.flush();
-      ObjectInputStream inStream = new ObjectInputStream(clientSocket.getInputStream());
+      inStream = new ObjectInputStream(clientSocket.getInputStream());
 
+      // send credentials
       outStream.writeUTF(args[1]);
       outStream.writeUTF(args[2]);
       outStream.flush();
@@ -47,16 +54,19 @@ public class SpertaClient {
         case OKNewUser:
           System.out.println("Ok. You are a new user");
           printhelp();
+          readCommands();
           break;
         case OKUser:
           System.out.println("OK, Welcome back");
           printhelp();
+          readCommands();
           break;
 
         default:
           break;
       }
 
+      // cleanup streams after command loop returns
       outStream.close();
       inStream.close();
     } catch (IOException e) {
@@ -72,6 +82,26 @@ public class SpertaClient {
     System.out.println("EC  <hm>  <d>  <int>  #  Enviar  valor  <int>  de  estado/temporização,  do dispositivo <d> da casa <hm>, para o servidor");
     System.out.println("RT <hm># Receber a informação sobre o último comando (estados/temporizações) enviado a cada dispositivo da casa <hm>, desde que o utilizador tenha permissões");
     System.out.println("RH <hm> <d># Receber o Histórico (ficheiro de log .csv) de comandos enviados ao dispositivo <d> da casa <hm>, desde que o utilizador tenha permissões");
+    System.out.println("");
   }
 
+  public static void readCommands() throws IOException {
+    Scanner sc = new Scanner(System.in);
+    boolean running = true;
+    while (running) {
+      System.out.print("Ação pretendida:");
+      String[] mensagem = sc.nextLine().split(" ");
+      sendCommand(mensagem);
+    }
+  sc.close();
+  }
+
+    private static String sendCommand(String[] parts) throws IOException {
+      for (String part : parts) {
+        outStream.writeUTF(part);
+      }
+      outStream.flush();
+      return inStream.readUTF();
+    }
+  
 }
