@@ -33,7 +33,7 @@ public class SpertaServer {
       while (true) {
         try {
           Socket inSoc = sSoc.accept();
-          ServerThread newServerThread = new ServerThread(inSoc);
+          ServerThread newServerThread = new ServerThread(this, inSoc);
           newServerThread.start();
         } catch (IOException e) {
           e.printStackTrace();

@@ -8,12 +8,15 @@ import java.net.Socket;
 
 class ServerThread extends Thread {
   private Socket socket = null;
+  private SpertaServer server;
 
-  ServerThread(Socket inSoc) {
-    socket = inSoc;
-    System.out.println("Thread stated for new client");
+  ServerThread(SpertaServer server, Socket inSoc) {
+    this.server = server;
+    this.socket = inSoc;
+    System.out.println("Thread started for new client");
   }
 
+  @Override
   public void start() {
     try (Socket clientSocket = socket;
         ObjectOutputStream outStream = new ObjectOutputStream(clientSocket.getOutputStream());
@@ -60,12 +63,19 @@ class ServerThread extends Thread {
       outStream.flush();
 
       while (true) {
-        Command cmd;
+        String cmdStr;
         try {
-          cmd = (Command) inStream.readObject();
-        } catch (ClassNotFoundException e) {
-          e.printStackTrace();
-          return;
+          cmdStr = inStream.readUTF();
+        } catch (IOException e) {
+          // client disconnected
+          break;
+        }
+        
+        Command cmd = Command.fromString(cmdStr);
+        if (cmd == null) {
+          outStream.writeUTF("UNKNOWN COMMAND");
+          outStream.flush();
+          continue;
         }
 
         switch (cmd) {
@@ -100,14 +110,14 @@ class ServerThread extends Thread {
     String home = inStream.readUTF();
     String device = inStream.readUTF();
     System.out.printf("Entregando log file do dispositivo %s casa\n", device, home);
-    outStream.writeObject(ServerResponse.NOK);
+    outStream.writeUTF(ServerResponse.OK.name());
     outStream.flush();
   }
 
   private void requestHomeLog(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
     String home = inStream.readUTF();
     System.out.printf("Entregando log file da casa %s\n", home);
-    outStream.writeObject(ServerResponse.NOK);
+    outStream.writeUTF(ServerResponse.OK.name());
     outStream.flush();
   }
 
@@ -116,7 +126,7 @@ class ServerThread extends Thread {
     String device = inStream.readUTF();
     int value = inStream.readInt();
     System.out.printf("ligando dispositivo %s em %s por %i\n", device, home, value);
-    outStream.writeObject(ServerResponse.NOK);
+    outStream.writeUTF(ServerResponse.OK.name());
     outStream.flush();
   }
 
@@ -124,7 +134,7 @@ class ServerThread extends Thread {
     String home = inStream.readUTF();
     String deviceType = inStream.readUTF();
     System.out.printf("Adicionando dispositivo %s à casa %s\n", deviceType, home);
-    outStream.writeObject(ServerResponse.NOK);
+    outStream.writeUTF(ServerResponse.OK.name());
     outStream.flush();
   }
 
@@ -133,14 +143,14 @@ class ServerThread extends Thread {
     String home = inStream.readUTF();
     String permission = inStream.readUTF();
     System.out.println("Usuario " + user + " adicionado com permissão " + permission + " à " + home);
-    outStream.writeObject(ServerResponse.NOK);
+    outStream.writeUTF(ServerResponse.OK.name());
     outStream.flush();
   }
 
   private void createHome(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
     String name = inStream.readUTF();
     System.out.println("Creating home '" + name + "'");
-    outStream.writeObject(ServerResponse.NOK);
+    outStream.writeUTF(ServerResponse.OK.name());
     outStream.flush();
   }
 
