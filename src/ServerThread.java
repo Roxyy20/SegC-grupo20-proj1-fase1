@@ -30,7 +30,7 @@ class ServerThread extends Thread {
         return;
       }
 
-      FileReader fileReader = new FileReader("../users.txt");
+      FileReader fileReader = new FileReader("users.txt");
       BufferedReader buffReader = new BufferedReader(fileReader);
       String line;
       Boolean found = false;
@@ -54,7 +54,7 @@ class ServerThread extends Thread {
         outStream.writeObject(LoginMessage.OKUser);
       } else {
         outStream.writeObject(LoginMessage.OKNewUser);
-        FileWriter fileWriter = new FileWriter("../users.txt",true);
+        FileWriter fileWriter = new FileWriter("users.txt",true);
         fileWriter.write(user + ":" + pass + "\n");
         fileWriter.close();
       }
