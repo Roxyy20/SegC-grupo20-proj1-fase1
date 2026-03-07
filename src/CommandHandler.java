@@ -103,6 +103,7 @@ public class CommandHandler {
       for (String l : lines) {
         writer.write(l + System.lineSeparator());
       }
+        writer.close();
     }
 
     System.out.printf("Adding device to section %s in home %s%n", section.name(), home);
@@ -115,13 +116,24 @@ public class CommandHandler {
     String home = inStream.readUTF();
     String permission = inStream.readUTF();
 
+    int permHomeValid = validatePermissionAndHome(permission, home);
+    if (permHomeValid == 1) {
+      outStream.writeUTF(ServerResponse.NOHM.name());
+      outStream.flush();
+      return;
+    }
+    if (permHomeValid == 2) {
+      outStream.writeUTF(ServerResponse.NOK.name());
+      outStream.flush();
+      return;
+    }
     String owner = findHomeOwner(home);
     if (!owner.equals(currentUser)) {
       outStream.writeUTF(ServerResponse.NOPERM.name());
       outStream.flush();
       return;
     }
-
+    
     Boolean userCreated = userExists(user);
     if(!userCreated){
         outStream.writeUTF(ServerResponse.NOUSER.name());
@@ -129,8 +141,8 @@ public class CommandHandler {
         return;
     }
 
+
     List<String> lines = new ArrayList<>();
-    boolean updated = false;
     File homesFile = new File(HOMES_FILE);
     try (BufferedReader reader = new BufferedReader(new FileReader(homesFile))) {
       String line;
@@ -139,23 +151,85 @@ public class CommandHandler {
         if (!parts[0].equalsIgnoreCase(home)) {
           lines.add(line);
         } else {
-          //TODO: fazer permissões
-          updated = true;
+          //verifica se já existe este user com permissoes
+          String prefix = user + "=";
+          if (line.contains(":" + prefix) || line.startsWith(prefix)) {
+            String[] segments = line.split(":");
+            StringBuilder rebuilt = new StringBuilder();
+            for (int i = 0; i < segments.length; i++) {
+              if (i > 0) {
+                rebuilt.append(":");
+              }
+              if (segments[i].startsWith(prefix)) {
+                String perms = segments[i].substring(prefix.length());
+                if (!perms.contains(permission)) {
+                  perms = perms + "," + permission;
+                }
+                rebuilt.append(user).append("=").append(perms);
+              } else {
+                rebuilt.append(segments[i]);
+              }
+            }
+            lines.add(rebuilt.toString());
+          } else {
+            lines.add(line + ":" + user + "=" + permission);
+          }
         }
       }
     }
 
-    if (!updated) {
-      outStream.writeUTF(ServerResponse.NOHM.name());
-      outStream.flush();
-      return;
+    try (FileWriter writer = new FileWriter(homesFile, false)) {
+      for (String l : lines) {
+        writer.write(l + System.lineSeparator());
+      }
+      writer.close();
     }
-
 
     System.out.println("Usuario " + user + " adicionado com permissão " + permission + " à " + home);
     outStream.writeUTF(ServerResponse.OK.name());
     outStream.flush();
   }
+
+  private static int validatePermissionAndHome(String permission, String home) {
+    int valid = 1;
+    File homesFile = new File(HOMES_FILE);
+    if (!homesFile.exists()) {
+      return valid;
+    }
+    try (BufferedReader reader = new BufferedReader(new FileReader(homesFile))) {
+      String line;
+      while ((line = reader.readLine()) != null) {
+        String[] parts = line.split(":");
+        if (parts.length < 2) {
+          continue;
+        }
+        if (parts[0].equalsIgnoreCase(home)) {
+          if (parts.length < 3 || parts[2].isEmpty()) {
+            return 2;
+          }
+          if (permission.equalsIgnoreCase("all")) {
+              return 0;
+          }
+          valid = 2;
+          String perms = parts[2];
+          String[] permParts = perms.split(",");
+          for (String p : permParts) {
+            String[] kv = p.split("=");
+            if (kv.length != 2) {
+              continue;
+            }
+            if (kv[0].equalsIgnoreCase(permission)) {
+              valid = 0;
+              break;
+            }
+          }
+        }
+      }
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    return valid;
+}
 
   private static Boolean userExists(String user) {
     File usersFile = new File("users.txt");
