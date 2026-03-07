@@ -1,3 +1,0 @@
-casaMelody:melody:M=2,G=1:roxy=G,M:mito=G
-casaMito:melody:M=1
-casaRoxy:melody

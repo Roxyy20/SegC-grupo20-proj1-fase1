@@ -86,8 +86,16 @@ public class CommandHandler {
           int next = counters.getOrDefault(key, 0) + 1;
           counters.put(key, next);
           String counterStr = countersToString(counters);
-          String newLine = counterStr.isEmpty() ? (parts[0] + ":" + parts[1]) : (parts[0] + ":" + parts[1] + ":" + counterStr);
-          lines.add(newLine);
+          StringBuilder newLine = new StringBuilder(parts[0]).append(":").append(parts[1]);
+          if (!counterStr.isEmpty()) {
+            newLine.append(":").append(counterStr);
+          }
+          if (parts.length > 3) {
+            for (int i = 3; i < parts.length; i++) {
+              newLine.append(":").append(parts[i]);
+            }
+          }
+          lines.add(newLine.toString());
           updated = true;
         }
       }
@@ -141,7 +149,6 @@ public class CommandHandler {
         return;
     }
 
-
     List<String> lines = new ArrayList<>();
     File homesFile = new File(HOMES_FILE);
     try (BufferedReader reader = new BufferedReader(new FileReader(homesFile))) {
@@ -151,6 +158,24 @@ public class CommandHandler {
         if (!parts[0].equalsIgnoreCase(home)) {
           lines.add(line);
         } else {
+          //caso a permissão seja "all"
+          String permToAdd = permission;
+          if (permission.equalsIgnoreCase("all")) {
+            String sectionList = "";
+            if (parts.length >= 3 && !parts[2].isEmpty()) {
+              String[] counters = parts[2].split(",");
+              StringBuilder sb = new StringBuilder();
+              for (String cnt : counters) {
+                String[] kv = cnt.split("=");
+                if (kv.length == 2 && !kv[1].equals("0")) {
+                  if (sb.length() > 0) sb.append(",");
+                  sb.append(kv[0]);
+                }
+              }
+              sectionList = sb.toString();
+            }
+            permToAdd = sectionList;
+          }
           //verifica se já existe este user com permissoes
           String prefix = user + "=";
           if (line.contains(":" + prefix) || line.startsWith(prefix)) {
@@ -162,17 +187,26 @@ public class CommandHandler {
               }
               if (segments[i].startsWith(prefix)) {
                 String perms = segments[i].substring(prefix.length());
-                if (!perms.contains(permission)) {
-                  perms = perms + "," + permission;
+                // merge existing with new permissions
+                String[] existing = perms.isEmpty() ? new String[0] : perms.split(",");
+                List<String> merged = new ArrayList<>();
+                for (String e : existing) {
+                  if (!e.isBlank()) merged.add(e);
                 }
-                rebuilt.append(user).append("=").append(perms);
+                for (String add : permToAdd.split(",")) {
+                  if (!merged.contains(add) && !add.isBlank()) {
+                    merged.add(add);
+                  }
+                }
+                String joined = String.join(",", merged);
+                rebuilt.append(user).append("=").append(joined);
               } else {
                 rebuilt.append(segments[i]);
               }
             }
             lines.add(rebuilt.toString());
           } else {
-            lines.add(line + ":" + user + "=" + permission);
+            lines.add(line + ":" + user + "=" + permToAdd);
           }
         }
       }
