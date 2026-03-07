@@ -115,17 +115,18 @@ public class CommandHandler {
     String home = inStream.readUTF();
     String permission = inStream.readUTF();
 
-    Boolean homeExists = findHome(home);
-    if (!homeExists) {
-      outStream.writeUTF(ServerResponse.NOHM.name());
-      outStream.flush();
-      return;
-    }
     String owner = findHomeOwner(home);
     if (!owner.equals(currentUser)) {
       outStream.writeUTF(ServerResponse.NOPERM.name());
       outStream.flush();
       return;
+    }
+
+    Boolean userCreated = userExists(user);
+    if(!userCreated){
+        outStream.writeUTF(ServerResponse.NOUSER.name());
+        outStream.flush();
+        return;
     }
 
     List<String> lines = new ArrayList<>();
@@ -138,10 +139,16 @@ public class CommandHandler {
         if (!parts[0].equalsIgnoreCase(home)) {
           lines.add(line);
         } else {
-          // TODO
+          //TODO: fazer permissões
           updated = true;
         }
       }
+    }
+
+    if (!updated) {
+      outStream.writeUTF(ServerResponse.NOHM.name());
+      outStream.flush();
+      return;
     }
 
 
@@ -149,6 +156,29 @@ public class CommandHandler {
     outStream.writeUTF(ServerResponse.OK.name());
     outStream.flush();
   }
+
+  private static Boolean userExists(String user) {
+    File usersFile = new File("users.txt");
+    if (!usersFile.exists()) {
+      return false;
+    }
+    try (BufferedReader reader = new BufferedReader(new FileReader(usersFile))) {
+      String line;
+      while ((line = reader.readLine()) != null) {
+        String[] parts = line.split(":");
+        if (parts.length < 2) {
+          continue;
+        }
+        if (parts[0].equalsIgnoreCase(user)) {
+          return true;
+        }
+      }
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    return false;
+  }
+    
 
   public static Boolean findHome(String home) {
     File homesFile = new File(HOMES_FILE);
