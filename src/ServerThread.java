@@ -1,4 +1,5 @@
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -8,6 +9,9 @@ import java.net.Socket;
 
 class ServerThread extends Thread {
   private Socket socket = null;
+  private String currentUser;
+  private static final String HOMES_FILE = "homes.txt";
+  private static final String HOMES_DIR = "homes";
 
   ServerThread(Socket inSoc) {
     socket = inSoc;
@@ -23,6 +27,7 @@ class ServerThread extends Thread {
 
       String user = inStream.readUTF();
       String pass = inStream.readUTF();
+      currentUser = user;
 
       if (user.isBlank() || pass.isBlank() || user.contains(":") || pass.contains(":")) {
         outStream.writeObject(LoginMessage.WrongPassword);
@@ -167,6 +172,41 @@ class ServerThread extends Thread {
 
   private void createHome(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
     String name = inStream.readUTF();
+    if (name.isBlank()) {
+      outStream.writeUTF(ServerResponse.NOK.name());
+      outStream.flush();
+      return;
+    }
+
+    File homesFile = new File(HOMES_FILE);
+    if (!homesFile.exists()) {
+      homesFile.createNewFile();
+    }
+
+    try (BufferedReader reader = new BufferedReader(new FileReader(homesFile))) {
+      String line;
+      //verifica se a casa já existe
+      while ((line = reader.readLine()) != null) {
+        String[] parts = line.split(":");
+        if (parts.length > 0 && parts[0].equalsIgnoreCase(name)) {
+          System.out.println("Home '" + name + "' already exists.");
+          outStream.writeUTF(ServerResponse.NOK.name());
+          outStream.flush();
+          return;
+        }
+      }
+    }
+
+    try (FileWriter writer = new FileWriter(homesFile, true)) {
+      writer.write(name + ":" + currentUser + System.lineSeparator());
+      writer.close();
+    }
+
+    File homesDir = new File(HOMES_DIR);
+    if (!homesDir.exists()) {
+      homesDir.mkdirs();
+    }
+
     System.out.println("Creating home '" + name + "'");
     outStream.writeUTF(ServerResponse.OK.name());
     outStream.flush();
