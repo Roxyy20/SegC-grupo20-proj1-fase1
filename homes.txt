@@ -1,1 +1,1 @@
-casaMelody:melody:G=1
+casaMelody:melody:M=1,G=1
