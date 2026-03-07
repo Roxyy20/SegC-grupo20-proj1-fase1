@@ -76,6 +76,7 @@ public class SpertaClient {
   }
 
   public static void printhelp() {
+    System.out.println("");
     System.out.println("Comandos Disponíveis:");
     System.out.println("CREATE <hm> # Criar casa <hm> - utilizador é Owner ");
     System.out.println("ADD <user1> <hm> <s> # Adicionar utilizador <user1> à casa <hm>, seção <s>");
@@ -90,6 +91,7 @@ public class SpertaClient {
     Scanner sc = new Scanner(System.in);
     boolean running = true;
     while (running) {
+      System.out.println("");
       System.out.print("Ação pretendida: ");
       String[] mensagem = sc.nextLine().split(" ");
       sendCommand(mensagem);
