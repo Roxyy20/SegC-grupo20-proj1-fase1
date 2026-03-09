@@ -38,9 +38,80 @@ public class CommandHandler {
     String home = inStream.readUTF();
     String device = inStream.readUTF();
     int value = inStream.readInt();
+
+    if(value < 0 || value > 600 || (value > 0 && value <1)){
+      outStream.writeUTF(ServerResponse.NOK.name());
+      outStream.flush();
+      return;
+    }
+    if(!findHome(home)){
+      outStream.writeUTF(ServerResponse.NOHM.name());
+      outStream.flush();
+      return;
+    }
+    int deviceCheck = findDeviceAndPermission(device, home);
+    if (deviceCheck == 1) {
+      outStream.writeUTF(ServerResponse.NOD.name());
+      outStream.flush();
+      return;
+    } else if (deviceCheck == 2) {
+      outStream.writeUTF(ServerResponse.NOPERM.name());
+      outStream.flush();
+      return;
+    }
+      //TODO implementar o txt
     System.out.printf("ligando dispositivo %s em %s por %i\n", device, home, value);
     outStream.writeUTF(ServerResponse.OK.name());
     outStream.flush();
+  }
+
+  private static int findDeviceAndPermission(String device, String home) {
+    File homesFile = new File(HOMES_FILE);
+    try (BufferedReader reader = new BufferedReader(new FileReader(homesFile))) {
+      String line;
+      while ((line = reader.readLine()) != null) {
+        String[] parts = line.split(":");
+        if (parts.length < 2 || !parts[0].equalsIgnoreCase(home)) {
+          continue;
+        }
+        Map<String, Integer> counters = countersToMap(parts.length > 2 ? parts[2] : "");
+        if (device.length() < 2) {
+          return 1;
+        }
+        char sectionChar = device.charAt(0);
+        String section = String.valueOf(sectionChar);
+        int num;
+        try {
+          num = Integer.parseInt(device.substring(1));
+        } catch (NumberFormatException e) {
+          return 1;
+        }
+        if (num < 1 || !counters.containsKey(section) || counters.get(section) < num) {
+          return 1;
+        }
+        String userPerms = null;
+        for (int i = 3; i < parts.length; i++) {
+          if (parts[i].startsWith(currentUser + "=")) {
+            userPerms = parts[i].substring((currentUser + "=").length());
+            break;
+          }
+        }
+        if (userPerms == null) {
+          return 2;
+        }
+        String[] perms = userPerms.split(",");
+        for (String p : perms) {
+          if (p.equals(section)) {
+            return 0;
+          }
+        }
+        return 2;
+      }
+    } catch (IOException e) {
+      e.printStackTrace();
+      return 1;
+    }
+    return 1;
   }
 
   public static void registerDevice(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
