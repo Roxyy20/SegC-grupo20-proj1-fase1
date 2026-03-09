@@ -106,9 +106,9 @@ public class CommandHandler {
       return 1;
     }
 
-    Integer counter = record.counters.get(section);
-    if (counter == null || num < 1 || num > counter) {
-      return 1;
+    Integer nextId = record.counters.get(section); // guarda o próximo id livre
+    if (nextId == null || num < 1 || num >= nextId) {
+      return 1; // dispositivo não existe
     }
 
     List<String> userPerms = record.permissions.get(currentUser);
@@ -147,11 +147,12 @@ public class CommandHandler {
     }
     
     String key = String.valueOf(section.name().charAt(0));
-    int next = record.counters.getOrDefault(key, 0) + 1;
-    record.counters.put(key, next);
+    // contador representa o próximo id a usar (começa em 1)
+    int nextId = record.counters.getOrDefault(key, 1);
+    record.counters.put(key, nextId + 1); // incrementa para o próximo pedido
     saveHomesToDisk();
 
-    System.out.printf("Adding device to section %s in home %s%n", section.name(), home);
+    System.out.printf("Adding device %s%d to section %s in home %s%n", key, nextId, section.name(), home);
     outStream.writeUTF(ServerResponse.OK.name());
     outStream.flush();
   }
@@ -276,6 +277,11 @@ public class CommandHandler {
     }
 
     HomeRecord record = new HomeRecord(name, currentUser);
+    // inicializa todos os contadores de secção a 1 (próximo id disponível)
+    for (Section s : Section.values()) {
+      String key = String.valueOf(s.name().charAt(0));
+      record.counters.put(key, 1);
+    }
     homes.put(name.toLowerCase(), record);
     saveHomesToDisk();
 
@@ -347,6 +353,11 @@ public class CommandHandler {
         HomeRecord record = new HomeRecord(homeName, parts[1]);
         if (parts.length >= 3 && !parts[2].isEmpty()) {
           record.counters = countersToMap(parts[2]);
+        }
+        // garante que todas as secções têm um contador (default 1 = próximo id)
+        for (Section s : Section.values()) {
+          String key = String.valueOf(s.name().charAt(0));
+          record.counters.putIfAbsent(key, 1);
         }
         // permissões começam na posição 3
         for (int i = 3; i < parts.length; i++) {
