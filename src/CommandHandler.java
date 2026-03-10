@@ -13,36 +13,36 @@ import java.util.Map;
 
 public class CommandHandler {
 
-    private static final String HOMES_FILE = "homes.txt";
-    private static final Map<String, HomeRecord> homes = new LinkedHashMap<>();
-    private static String currentUser;
+  private static final String HOMES_FILE = "homes.txt";
+  private static final Map<String, HomeRecord> homes = new LinkedHashMap<>();
+  private String currentUser;
 
-    static {
-      loadHomesFromDisk();
+  static {
+    loadHomesFromDisk();
+  }
+
+  public CommandHandler(String user) {
+    currentUser = user;
+  }
+
+  /*
+   * Estrutura em memória para cada casa, evitando leituras repetidas ao ficheiro.
+   */
+  private static class HomeRecord {
+    final String name;
+    String owner;
+    Map<String, Integer> counters;
+    Map<String, List<String>> permissions;
+
+    HomeRecord(String name, String owner) {
+      this.name = name;
+      this.owner = owner;
+      this.counters = new HashMap<>();
+      this.permissions = new HashMap<>();
     }
+  }
 
-    public CommandHandler(String user) {
-        currentUser = user;
-    }
-
-    /*
-     * Estrutura em memória para cada casa, evitando leituras repetidas ao ficheiro.
-     */
-    private static class HomeRecord {
-      final String name;
-      String owner;
-      Map<String, Integer> counters;
-      Map<String, List<String>> permissions;
-
-      HomeRecord(String name, String owner) {
-        this.name = name;
-        this.owner = owner;
-        this.counters = new HashMap<>();
-        this.permissions = new HashMap<>();
-      }
-    }
-
-    public static void requestDeviceLog(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
+  public void requestDeviceLog(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
     String home = inStream.readUTF();
     String device = inStream.readUTF();
     System.out.printf("Entregando log file do dispositivo %s casa\n", device, home);
@@ -50,24 +50,24 @@ public class CommandHandler {
     outStream.flush();
   }
 
-  public static void requestHomeLog(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
+  public void requestHomeLog(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
     String home = inStream.readUTF();
     System.out.printf("Entregando log file da casa %s\n", home);
     outStream.writeUTF(ServerResponse.OK.name());
     outStream.flush();
   }
 
-  public static void setStateOrTimer(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
+  public void setStateOrTimer(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
     String home = inStream.readUTF();
     String device = inStream.readUTF();
     int value = inStream.readInt();
 
-    if(value < 0 || value > 600 || (value > 0 && value <1)){
+    if (value < 0 || value > 600 || (value > 0 && value < 1)) {
       outStream.writeUTF(ServerResponse.NOK.name());
       outStream.flush();
       return;
     }
-    if(getHome(home) == null){
+    if (getHome(home) == null) {
       outStream.writeUTF(ServerResponse.NOHM.name());
       outStream.flush();
       return;
@@ -82,13 +82,13 @@ public class CommandHandler {
       outStream.flush();
       return;
     }
-      //TODO implementar o txt
+    // TODO implementar o txt
     System.out.printf("ligando dispositivo %s em %s por %i\n", device, home, value);
     outStream.writeUTF(ServerResponse.OK.name());
     outStream.flush();
   }
 
-  private static int findDeviceAndPermission(String device, String home) {
+  private int findDeviceAndPermission(String device, String home) {
     HomeRecord record = getHome(home);
     if (record == null) {
       return 1;
@@ -123,7 +123,7 @@ public class CommandHandler {
     return 2;
   }
 
-  public static void registerDevice(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
+  public void registerDevice(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
     String home = inStream.readUTF();
     String sectionCode = inStream.readUTF();
 
@@ -138,14 +138,14 @@ public class CommandHandler {
       outStream.flush();
       return;
     }
-    
+
     Section section = Section.parseSection(sectionCode);
     if (section == null) {
       outStream.writeUTF(ServerResponse.NOK.name());
       outStream.flush();
       return;
     }
-    
+
     String key = String.valueOf(section.name().charAt(0));
     // contador representa o próximo id a usar (começa em 1)
     int nextId = record.counters.getOrDefault(key, 1);
@@ -157,7 +157,7 @@ public class CommandHandler {
     outStream.flush();
   }
 
-  public static void addPermission(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
+  public void addPermission(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
     String user = inStream.readUTF();
     String home = inStream.readUTF();
     String permission = inStream.readUTF();
@@ -184,12 +184,12 @@ public class CommandHandler {
       outStream.flush();
       return;
     }
-    
+
     Boolean userCreated = userExists(user);
-    if(!userCreated){
-        outStream.writeUTF(ServerResponse.NOUSER.name());
-        outStream.flush();
-        return;
+    if (!userCreated) {
+      outStream.writeUTF(ServerResponse.NOUSER.name());
+      outStream.flush();
+      return;
     }
 
     String permToAdd = permission;
@@ -197,7 +197,8 @@ public class CommandHandler {
       StringBuilder sb = new StringBuilder();
       for (Map.Entry<String, Integer> entry : record.counters.entrySet()) {
         if (entry.getValue() > 0) {
-          if (sb.length() > 0) sb.append(",");
+          if (sb.length() > 0)
+            sb.append(",");
           sb.append(entry.getKey());
         }
       }
@@ -206,7 +207,8 @@ public class CommandHandler {
 
     List<String> existing = record.permissions.getOrDefault(user, new ArrayList<>());
     for (String add : permToAdd.split(",")) {
-      if (add.isBlank()) continue;
+      if (add.isBlank())
+        continue;
       if (!existing.contains(add)) {
         existing.add(add);
       }
@@ -219,20 +221,20 @@ public class CommandHandler {
     outStream.flush();
   }
 
-  private static int validatePermissionAndHome(String permission, String home) {
+  private int validatePermissionAndHome(String permission, String home) {
     HomeRecord record = getHome(home);
     if (record == null) {
       return 1;
     }
     if (permission.equalsIgnoreCase("all")) {
-      return record.counters.isEmpty() ? 2 : 0; 
+      return record.counters.isEmpty() ? 2 : 0;
     }
-    String key = permission.substring(0,1).toUpperCase();
+    String key = permission.substring(0, 1).toUpperCase();
     if (record.counters.containsKey(key)) {
       return 0;
     }
     return 2;
-}
+  }
 
   private static Boolean userExists(String user) {
     File usersFile = new File("users.txt");
@@ -255,13 +257,12 @@ public class CommandHandler {
     }
     return false;
   }
-    
 
   public static Boolean findHome(String home) {
     return getHome(home) != null;
   }
 
-  public static void createHome(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
+  public void createHome(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
     String name = inStream.readUTF();
     if (name.isBlank()) {
       outStream.writeUTF(ServerResponse.NOK.name());
@@ -346,9 +347,11 @@ public class CommandHandler {
     try (BufferedReader reader = new BufferedReader(new FileReader(homesFile))) {
       String line;
       while ((line = reader.readLine()) != null) {
-        if (line.isBlank()) continue;
+        if (line.isBlank())
+          continue;
         String[] parts = line.split(":");
-        if (parts.length < 2) continue;
+        if (parts.length < 2)
+          continue;
         String homeName = parts[0];
         HomeRecord record = new HomeRecord(homeName, parts[1]);
         if (parts.length >= 3 && !parts[2].isEmpty()) {
@@ -363,13 +366,15 @@ public class CommandHandler {
         for (int i = 3; i < parts.length; i++) {
           String perm = parts[i];
           int idx = perm.indexOf("=");
-          if (idx <= 0) continue;
+          if (idx <= 0)
+            continue;
           String user = perm.substring(0, idx);
           String permList = perm.substring(idx + 1);
           List<String> sections = new ArrayList<>();
           if (!permList.isBlank()) {
             for (String p : permList.split(",")) {
-              if (!p.isBlank()) sections.add(p);
+              if (!p.isBlank())
+                sections.add(p);
             }
           }
           record.permissions.put(user, sections);
@@ -415,7 +420,8 @@ public class CommandHandler {
   }
 
   private static HomeRecord getHome(String name) {
-    if (name == null) return null;
+    if (name == null)
+      return null;
     return homes.get(name.toLowerCase());
   }
 

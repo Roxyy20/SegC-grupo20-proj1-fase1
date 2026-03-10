@@ -8,7 +8,6 @@ import java.net.Socket;
 
 class ServerThread extends Thread {
   private Socket socket = null;
-  private String currentUser;
 
   ServerThread(Socket inSoc) {
     socket = inSoc;
@@ -24,8 +23,7 @@ class ServerThread extends Thread {
 
       String user = inStream.readUTF();
       String pass = inStream.readUTF();
-      currentUser = user;
-
+      
       if (user.isBlank() || pass.isBlank() || user.contains(":") || pass.contains(":")) {
         outStream.writeObject(LoginMessage.WrongPassword);
         outStream.flush();
@@ -56,7 +54,7 @@ class ServerThread extends Thread {
         outStream.writeObject(LoginMessage.OKUser);
       } else {
         outStream.writeObject(LoginMessage.OKNewUser);
-        FileWriter fileWriter = new FileWriter("users.txt",true);
+        FileWriter fileWriter = new FileWriter("users.txt", true);
         fileWriter.write(user + ":" + pass + "\n");
         fileWriter.close();
       }
@@ -73,7 +71,7 @@ class ServerThread extends Thread {
           // client disconnected
           break;
         }
-        
+
         Command cmd = Command.fromString(cmdStr);
         if (cmd == null) {
           outStream.writeUTF("UNKNOWN COMMAND");
@@ -83,22 +81,22 @@ class ServerThread extends Thread {
 
         switch (cmd) {
           case CREATE:
-            CommandHandler.createHome(outStream, inStream);
+            commandHandler.createHome(outStream, inStream);
             break;
           case ADD:
-            CommandHandler.addPermission(outStream, inStream);
+            commandHandler.addPermission(outStream, inStream);
             break;
           case RD:
-            CommandHandler.registerDevice(outStream, inStream);
+            commandHandler.registerDevice(outStream, inStream);
             break;
           case EC:
-            CommandHandler.setStateOrTimer(outStream, inStream);
+            commandHandler.setStateOrTimer(outStream, inStream);
             break;
           case RT:
-            CommandHandler.requestHomeLog(outStream, inStream);
+            commandHandler.requestHomeLog(outStream, inStream);
             break;
           case RH:
-            CommandHandler.requestDeviceLog(outStream, inStream);
+            commandHandler.requestDeviceLog(outStream, inStream);
             break;
           default:
             break;
@@ -109,17 +107,17 @@ class ServerThread extends Thread {
     }
   }
 
-  private void readNewPassword(ObjectOutputStream outStream, ObjectInputStream inStream, String pass) throws IOException {
+  private void readNewPassword(ObjectOutputStream outStream, ObjectInputStream inStream, String pass)
+      throws IOException {
     while (true) {
       String newPass = inStream.readUTF();
       System.out.println("Received new password: " + newPass + " password: " + pass);
       System.out.println(newPass.equals(pass));
-      if(!newPass.equals(pass)){
+      if (!newPass.equals(pass)) {
         System.out.println("Wrong password. Entrou no if");
         outStream.writeObject(LoginMessage.WrongPassword);
         outStream.flush();
-      }
-      else if (newPass.equals(pass)){
+      } else if (newPass.equals(pass)) {
         System.out.println("Password correct. Entrou no else");
         outStream.writeObject(LoginMessage.OKUser);
         outStream.flush();
@@ -128,5 +126,3 @@ class ServerThread extends Thread {
     }
   }
 }
-
-  
