@@ -1,12 +1,12 @@
 public enum Command {
-  CREATE,
-  ADD,
-  RD,
-  EC,
-  RT,
-  RH;
+    CREATE,
+    ADD,
+    RD,
+    EC,
+    RT,
+    RH;
 
-  public static Command fromString(String text) {
+    public static Command fromString(String text) {
         try {
             return Command.valueOf(text.toUpperCase());
         } catch (IllegalArgumentException e) {

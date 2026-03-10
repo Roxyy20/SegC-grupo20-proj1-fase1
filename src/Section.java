@@ -1,12 +1,12 @@
 public enum Section {
-    MULTIMEDIA,
-    LUZES,
-    PORTAS,
-    GARDEN,
-    STORES,
-    ELECTROS; 
+  MULTIMEDIA,
+  LUZES,
+  PORTAS,
+  GARDEN,
+  STORES,
+  ELECTROS;
 
-    public static Section parseSection(String code) {
+  public static Section parseSection(String code) {
     if (code == null || code.isBlank()) {
       return null;
     }
@@ -18,4 +18,4 @@ public enum Section {
     }
     return null;
   }
-    }
+}

@@ -4,6 +4,6 @@ public enum ServerResponse {
   NODATA,
   NOPERM,
   NOHM,
-  NOD, 
+  NOD,
   NOUSER
 }

@@ -23,7 +23,7 @@ class ServerThread extends Thread {
 
       String user = inStream.readUTF();
       String pass = inStream.readUTF();
-      
+
       if (user.isBlank() || pass.isBlank() || user.contains(":") || pass.contains(":")) {
         outStream.writeObject(LoginMessage.WrongPassword);
         outStream.flush();
