@@ -81,9 +81,12 @@ public class SpertaClient {
     System.out.println("- CREATE <hm> # Criar casa <hm> - utilizador é Owner ");
     System.out.println("- ADD <user1> <hm> <s> # Adicionar utilizador <user1> à casa <hm>, seção <s>");
     System.out.println("- RD <hm> <s> # Registar um Dispositivo na casa <hm>, na seção <s>");
-    System.out.println("- EC  <hm>  <d>  <int>  #  Enviar  valor  <int>  de  estado/temporização,  do dispositivo <d> da casa <hm>, para o servidor");
-    System.out.println("- RT <hm># Receber a informação sobre o último comando (estados/temporizações) enviado a cada dispositivo da casa <hm>, desde que o utilizador tenha permissões");
-    System.out.println("- RH <hm> <d># Receber o Histórico (ficheiro de log .csv) de comandos enviados ao dispositivo <d> da casa <hm>, desde que o utilizador tenha permissões");
+    System.out.println(
+        "- EC  <hm>  <d>  <int>  #  Enviar  valor  <int>  de  estado/temporização,  do dispositivo <d> da casa <hm>, para o servidor");
+    System.out.println(
+        "- RT <hm># Receber a informação sobre o último comando (estados/temporizações) enviado a cada dispositivo da casa <hm>, desde que o utilizador tenha permissões");
+    System.out.println(
+        "- RH <hm> <d># Receber o Histórico (ficheiro de log .csv) de comandos enviados ao dispositivo <d> da casa <hm>, desde que o utilizador tenha permissões");
     System.out.println("");
   }
 
@@ -97,58 +100,52 @@ public class SpertaClient {
       sendCommand(mensagem);
       receiveResponse();
     }
-  sc.close();
+    sc.close();
   }
 
-    private static void sendCommand(String[] parts) throws IOException {
-      String command = parts[0];
-      Command cmdEnum = Command.fromString(command);
-      if (cmdEnum == null) {
-        System.out.println("Comando não existe");
-        return;
-      }
-      if (cmdEnum == Command.CREATE && parts.length != 2) {
-        System.out.println("Comando CREATE requer 1 argumento: <hm> ");
-        return;
-      }
-      else if (cmdEnum == Command.ADD && parts.length != 4) {
-        System.out.println("Comando ADD requer 3 argumentos: <user1> <hm> <s>");
-        return;
-      }
-      else if (cmdEnum == Command.EC && parts.length != 4) {
-        System.out.println("Comando EC requer 4 argumentos: <hm>  <d>  <int>");
-        return;
-      }
-      else if (cmdEnum == Command.RT && parts.length != 2) {
-        System.out.println("Comando RT requer 1 argumento: <hm>");
-        return;
-      }
-      else if (cmdEnum == Command.RH && parts.length != 3) {
-        System.out.println("Comando RH requer 2 argumentos: <hm> <d>");
-        return;
-      }
-      else if (cmdEnum == Command.RD && parts.length != 3) {
-        System.out.println("Comando RD requer 2 argumentos: <hm> <s>");
-        return;
-      }
-      if(cmdEnum == Command.EC){
-        String hm = parts[1];
-        String d = parts[2];
-        int intValue = Integer.parseInt(parts[3]);
-        outStream.writeUTF(hm);
-        outStream.writeUTF(d);
-        outStream.writeInt(intValue);
-      }
-      else {
-        for (String part : parts) {
-          outStream.writeUTF(part);
-        }
-      }
-      outStream.flush();
+  private static void sendCommand(String[] parts) throws IOException {
+    String command = parts[0];
+    Command cmdEnum = Command.fromString(command);
+    if (cmdEnum == null) {
+      System.out.println("Comando não existe");
+      return;
     }
+    if (cmdEnum == Command.CREATE && parts.length != 2) {
+      System.out.println("Comando CREATE requer 1 argumento: <hm> ");
+      return;
+    } else if (cmdEnum == Command.ADD && parts.length != 4) {
+      System.out.println("Comando ADD requer 3 argumentos: <user1> <hm> <s>");
+      return;
+    } else if (cmdEnum == Command.EC && parts.length != 4) {
+      System.out.println("Comando EC requer 4 argumentos: <hm>  <d>  <int>");
+      return;
+    } else if (cmdEnum == Command.RT && parts.length != 2) {
+      System.out.println("Comando RT requer 1 argumento: <hm>");
+      return;
+    } else if (cmdEnum == Command.RH && parts.length != 3) {
+      System.out.println("Comando RH requer 2 argumentos: <hm> <d>");
+      return;
+    } else if (cmdEnum == Command.RD && parts.length != 3) {
+      System.out.println("Comando RD requer 2 argumentos: <hm> <s>");
+      return;
+    }
+    if (cmdEnum == Command.EC) {
+      String hm = parts[1];
+      String d = parts[2];
+      int intValue = Integer.parseInt(parts[3]);
+      outStream.writeUTF(hm);
+      outStream.writeUTF(d);
+      outStream.writeInt(intValue);
+    } else {
+      for (String part : parts) {
+        outStream.writeUTF(part);
+      }
+    }
+    outStream.flush();
+  }
 
-    private static void tryNewPassword() throws IOException {
-      Scanner sc = new Scanner(System.in);
+  private static void tryNewPassword() throws IOException {
+    try (Scanner sc = new Scanner(System.in)) {
       while (true) {
         System.out.print("Enter new password: ");
         String newPassword = sc.nextLine();
@@ -166,14 +163,15 @@ public class SpertaClient {
         } else {
           break;
         }
-     }
-      printhelp();
-      readCommands();
+      }
     }
+    printhelp();
+    readCommands();
+  }
 
-    private static void receiveResponse() throws IOException {
-      String response = inStream.readUTF();
-      System.out.println("Resposta do servidor: " + response);
-    }
-  
+  private static void receiveResponse() throws IOException {
+    String response = inStream.readUTF();
+    System.out.println("Resposta do servidor: " + response);
+  }
+
 }
