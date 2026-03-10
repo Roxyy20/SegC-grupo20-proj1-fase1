@@ -1,2 +1,3 @@
-rm src/*.class > /dev/null
+touch src/fake.class
+rm src/*.class
 javac src/*.java

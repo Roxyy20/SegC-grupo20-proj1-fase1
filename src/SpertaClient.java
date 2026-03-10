@@ -95,7 +95,7 @@ public class SpertaClient {
       System.out.print("Ação pretendida: ");
       String[] mensagem = sc.nextLine().split(" ");
       sendCommand(mensagem);
-      reciveResponse();
+      receiveResponse();
     }
   sc.close();
   }
@@ -171,7 +171,7 @@ public class SpertaClient {
       readCommands();
     }
 
-    private static void reciveResponse() throws IOException {
+    private static void receiveResponse() throws IOException {
       String response = inStream.readUTF();
       System.out.println("Resposta do servidor: " + response);
     }
