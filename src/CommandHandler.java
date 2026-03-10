@@ -1,12 +1,10 @@
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -14,7 +12,7 @@ import java.util.Map;
 public class CommandHandler {
 
   private static final String HOMES_FILE = "homes.txt";
-  private static final Map<String, HomeRecord> homes = new LinkedHashMap<>();
+  private static final Map<String, Home> homes = new LinkedHashMap<>();
   private String currentUser;
 
   static {
@@ -23,23 +21,6 @@ public class CommandHandler {
 
   public CommandHandler(String user) {
     currentUser = user;
-  }
-
-  /*
-   * Estrutura em memória para cada casa, evitando leituras repetidas ao ficheiro.
-   */
-  private static class HomeRecord {
-    final String name;
-    String owner;
-    Map<String, Integer> counters;
-    Map<String, List<String>> permissions;
-
-    HomeRecord(String name, String owner) {
-      this.name = name;
-      this.owner = owner;
-      this.counters = new HashMap<>();
-      this.permissions = new HashMap<>();
-    }
   }
 
   public void requestDeviceLog(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
@@ -89,7 +70,7 @@ public class CommandHandler {
   }
 
   private int findDeviceAndPermission(String device, String home) {
-    HomeRecord record = getHome(home);
+    Home record = getHome(home);
     if (record == null) {
       return 1;
     }
@@ -106,7 +87,7 @@ public class CommandHandler {
       return 1;
     }
 
-    Integer nextId = record.counters.get(section); // guarda o próximo id livre
+    Integer nextId = record.creationCounters.get(section); // guarda o próximo id livre
     if (nextId == null || num < 1 || num >= nextId) {
       return 1; // dispositivo não existe
     }
@@ -127,7 +108,7 @@ public class CommandHandler {
     String home = inStream.readUTF();
     String sectionCode = inStream.readUTF();
 
-    HomeRecord record = getHome(home);
+    Home record = getHome(home);
     if (record == null) {
       outStream.writeUTF(ServerResponse.NOHM.name());
       outStream.flush();
@@ -148,8 +129,8 @@ public class CommandHandler {
 
     String key = String.valueOf(section.name().charAt(0));
     // contador representa o próximo id a usar (começa em 1)
-    int nextId = record.counters.getOrDefault(key, 1);
-    record.counters.put(key, nextId + 1); // incrementa para o próximo pedido
+    int nextId = record.creationCounters.getOrDefault(key, 1);
+    record.creationCounters.put(key, nextId + 1); // incrementa para o próximo pedido
     saveHomesToDisk();
 
     System.out.printf("Adding device %s%d to section %s in home %s%n", key, nextId, section.name(), home);
@@ -173,7 +154,7 @@ public class CommandHandler {
       outStream.flush();
       return;
     }
-    HomeRecord record = getHome(home);
+    Home record = getHome(home);
     if (record == null) {
       outStream.writeUTF(ServerResponse.NOHM.name());
       outStream.flush();
@@ -195,7 +176,7 @@ public class CommandHandler {
     String permToAdd = permission;
     if (permission.equalsIgnoreCase("all")) {
       StringBuilder sb = new StringBuilder();
-      for (Map.Entry<String, Integer> entry : record.counters.entrySet()) {
+      for (Map.Entry<String, Integer> entry : record.creationCounters.entrySet()) {
         if (entry.getValue() > 0) {
           if (sb.length() > 0)
             sb.append(",");
@@ -222,15 +203,15 @@ public class CommandHandler {
   }
 
   private int validatePermissionAndHome(String permission, String home) {
-    HomeRecord record = getHome(home);
+    Home record = getHome(home);
     if (record == null) {
       return 1;
     }
     if (permission.equalsIgnoreCase("all")) {
-      return record.counters.isEmpty() ? 2 : 0;
+      return record.creationCounters.isEmpty() ? 2 : 0;
     }
     String key = permission.substring(0, 1).toUpperCase();
-    if (record.counters.containsKey(key)) {
+    if (record.creationCounters.containsKey(key)) {
       return 0;
     }
     return 2;
@@ -277,11 +258,11 @@ public class CommandHandler {
       return;
     }
 
-    HomeRecord record = new HomeRecord(name, currentUser);
+    Home record = new Home(name, currentUser);
     // inicializa todos os contadores de secção a 1 (próximo id disponível)
     for (Section s : Section.values()) {
       String key = String.valueOf(s.name().charAt(0));
-      record.counters.put(key, 1);
+      record.creationCounters.put(key, 1);
     }
     homes.put(name.toLowerCase(), record);
     saveHomesToDisk();
@@ -292,46 +273,8 @@ public class CommandHandler {
   }
 
   public static String findHomeOwner(String homeName) {
-    HomeRecord record = getHome(homeName);
+    Home record = getHome(homeName);
     return record == null ? null : record.owner;
-  }
-
-  public static Map<String, Integer> countersToMap(String countersStr) {
-    if (countersStr == null) {
-      return new HashMap<>();
-    }
-    Map<String, Integer> counters = new HashMap<>();
-    String[] parts = countersStr.split(",");
-    for (String p : parts) {
-      String[] kv = p.split("=");
-      if (kv.length != 2) {
-        continue;
-      }
-      try {
-        counters.put(kv[0], Integer.valueOf(kv[1]));
-      } catch (NumberFormatException e) {
-        counters.put(kv[0], 0);
-      }
-    }
-    return counters;
-  }
-
-  public static String countersToString(Map<String, Integer> counters) {
-    StringBuilder sb = new StringBuilder();
-    boolean first = true;
-    for (Section s : Section.values()) {
-      String key = String.valueOf(s.name().charAt(0));
-      int val = counters.getOrDefault(key, 0);
-      if (val <= 0) {
-        continue;
-      }
-      if (!first) {
-        sb.append(",");
-      }
-      sb.append(key).append("=").append(val);
-      first = false;
-    }
-    return sb.toString();
   }
 
   /**
@@ -340,86 +283,17 @@ public class CommandHandler {
    */
   private static void loadHomesFromDisk() {
     homes.clear();
-    File homesFile = new File(HOMES_FILE);
-    if (!homesFile.exists()) {
-      return;
-    }
-    try (BufferedReader reader = new BufferedReader(new FileReader(homesFile))) {
-      String line;
-      while ((line = reader.readLine()) != null) {
-        if (line.isBlank())
-          continue;
-        String[] parts = line.split(":");
-        if (parts.length < 2)
-          continue;
-        String homeName = parts[0];
-        HomeRecord record = new HomeRecord(homeName, parts[1]);
-        if (parts.length >= 3 && !parts[2].isEmpty()) {
-          record.counters = countersToMap(parts[2]);
-        }
-        // garante que todas as secções têm um contador (default 1 = próximo id)
-        for (Section s : Section.values()) {
-          String key = String.valueOf(s.name().charAt(0));
-          record.counters.putIfAbsent(key, 1);
-        }
-        // permissões começam na posição 3
-        for (int i = 3; i < parts.length; i++) {
-          String perm = parts[i];
-          int idx = perm.indexOf("=");
-          if (idx <= 0)
-            continue;
-          String user = perm.substring(0, idx);
-          String permList = perm.substring(idx + 1);
-          List<String> sections = new ArrayList<>();
-          if (!permList.isBlank()) {
-            for (String p : permList.split(",")) {
-              if (!p.isBlank())
-                sections.add(p);
-            }
-          }
-          record.permissions.put(user, sections);
-        }
-        homes.put(homeName.toLowerCase(), record);
-      }
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
+    homes.putAll(Home.loadHomesFromDisk(HOMES_FILE));
   }
 
   /**
    * Persiste o cache atual para o ficheiro homes.txt de uma só vez.
    */
   private static void saveHomesToDisk() {
-    File homesFile = new File(HOMES_FILE);
-    try (FileWriter writer = new FileWriter(homesFile, false)) {
-      for (HomeRecord record : homes.values()) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(record.name).append(":").append(record.owner);
-        String countersStr = countersToString(record.counters);
-        boolean hasCounters = !countersStr.isEmpty();
-        if (hasCounters) {
-          sb.append(":").append(countersStr);
-        }
-        boolean firstPerm = true;
-        for (Map.Entry<String, List<String>> entry : record.permissions.entrySet()) {
-          if (firstPerm) {
-            sb.append(hasCounters ? ":" : ":");
-            firstPerm = false;
-          } else {
-            sb.append(":");
-          }
-          sb.append(entry.getKey()).append("=");
-          sb.append(String.join(",", entry.getValue()));
-        }
-        writer.write(sb.toString());
-        writer.write(System.lineSeparator());
-      }
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
+    Home.saveHomesToDisk(homes.values(), HOMES_FILE);
   }
 
-  private static HomeRecord getHome(String name) {
+  private static Home getHome(String name) {
     if (name == null)
       return null;
     return homes.get(name.toLowerCase());

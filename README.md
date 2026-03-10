@@ -17,6 +17,7 @@ to build the project run:
 ## Running Server
 
 to run the server:
+
 - Build the project
 - ```
   ./SpertaServer.sh [<port>]
@@ -25,7 +26,17 @@ to run the server:
 ## Running Client
 
 to run the client:
+
 - Build the project
 - ```
   ./SpertaClient.sh <server_address>[:<port>] <user-id> <password>
   ```
+
+## TODO
+
+- [x] Create
+- [x] Add
+- [x] RD
+- [ ] RT
+- [ ] RH
+- [ ] EC
