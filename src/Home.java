@@ -31,8 +31,7 @@ public class Home {
     this.owner = owner;
     this.creationCounters.putAll(countersToMap(counters));
 
-    for (int i = 0; i < permissions.length; i++) {
-      String perm = permissions[i];
+    for (String perm : permissions) {
       int idx = perm.indexOf("=");
       if (idx <= 0)
         return;
@@ -49,7 +48,91 @@ public class Home {
     }
   }
 
-  public static Map<String, Integer> countersToMap(String countersStr) {
+  // returns list with lines
+  public List<String> requestDeviceLog(String device) {
+    System.out.printf("Entregando log file do dispositivo %s casa\n", device, name);
+    return null;
+  }
+
+  // returns list of commands
+  public List<String> requestHomeLog() {
+    System.out.printf("Entregando log file da casa %s\n", name);
+    return null;
+  }
+
+  public ServerResponse setStateOrTimer(String device, int value, String user) {
+    if (value < 0 || value > 600)
+      return ServerResponse.NOK;
+
+    ServerResponse perm = findDeviceAndPermission(device, user);
+    if (!ServerResponse.OK.equals(perm))
+      return perm;
+
+    // change device state
+
+    return ServerResponse.OK;
+  }
+
+  public ServerResponse registerDevice(String sectionCode, String currentUser) {
+    if (!owner.equals(currentUser))
+      return ServerResponse.NOPERM;
+
+    Section section = Section.parseSection(sectionCode);
+    if (section == null)
+      return ServerResponse.NOK;
+
+    String key = String.valueOf(section.name().charAt(0));
+    int nextId = creationCounters.getOrDefault(key, 1);
+    creationCounters.put(key, nextId + 1);
+    System.out.printf("Adding device %s%d to section %s in home %s%n", key, nextId, section.name(), name);
+    return ServerResponse.OK;
+  }
+
+  public ServerResponse addPermission(String user, String permission, String currentUser) {
+    if (!owner.equals(currentUser))
+      return ServerResponse.NOPERM;
+    System.out.println("Usuario " + user + " adicionado com permissão " + permission + " à " + name);
+
+    if (permission.equalsIgnoreCase("all")) {
+      List<String> perms = new ArrayList<>();
+      perms.add("s");
+      permissions.put(user, perms);
+    } else {
+      List<String> perms = permissions.getOrDefault(user, new ArrayList<>());
+      perms.add(permission);
+      permissions.put(user, perms);
+    }
+    return ServerResponse.OK;
+  }
+
+  private ServerResponse findDeviceAndPermission(String device, String user) {
+    if (device == null || device.length() < 2)
+      return ServerResponse.NOD;
+    String section = String.valueOf(device.charAt(0)).toUpperCase();
+    int num;
+    try {
+      num = Integer.parseInt(device.substring(1));
+    } catch (NumberFormatException e) {
+      return ServerResponse.NOD;
+    }
+
+    Integer nextId = creationCounters.get(section);
+    if (nextId == null || num < 1 || num >= nextId)
+      return ServerResponse.NOD;
+
+    List<String> userPerms = permissions.get(user);
+    if (userPerms == null)
+      return ServerResponse.NOPERM;
+
+    for (String p : userPerms)
+      if (p.equalsIgnoreCase(section))
+        return ServerResponse.OK;
+
+    return ServerResponse.NOPERM;
+
+  }
+
+  private static Map<String, Integer> countersToMap(String countersStr) {
     if (countersStr == null) {
       return new HashMap<>();
     }
@@ -69,7 +152,7 @@ public class Home {
     return counters;
   }
 
-  public static String countersToString(Map<String, Integer> counters) {
+  private static String countersToString(Map<String, Integer> counters) {
     StringBuilder sb = new StringBuilder();
     boolean first = true;
     for (Section s : Section.values()) {
@@ -87,7 +170,7 @@ public class Home {
     return sb.toString();
   }
 
-  public static void saveHomesToDisk(Collection<Home> homes, String filename) {
+  public synchronized static void saveHomesToDisk(Collection<Home> homes, String filename) {
     File homesFile = new File(filename);
     try (FileWriter writer = new FileWriter(homesFile, false)) {
       for (Home home : homes) {
@@ -117,7 +200,7 @@ public class Home {
     }
   }
 
-  public static Map<String, Home> loadHomesFromDisk(String filename) {
+  public synchronized static Map<String, Home> loadHomesFromDisk(String filename) {
     File homesFile = new File(filename);
     Map<String, Home> homes = new HashMap<>();
     if (!homesFile.exists())
