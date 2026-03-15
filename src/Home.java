@@ -60,6 +60,10 @@ public class Home {
     return null;
   }
 
+  public ServerResponse canAccessDevice(String device, String user) {
+    return findDeviceAndPermission(device, user);
+  }
+
   public ServerResponse setStateOrTimer(String device, int value, String user) {
     if (value < 0 || value > 600)
       return ServerResponse.NOK;

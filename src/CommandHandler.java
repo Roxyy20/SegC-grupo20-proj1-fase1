@@ -53,8 +53,40 @@ public class CommandHandler {
     }
     Home home = getHome(homeName);
 
-    List<String> cmds = home.requestHomeLog();
-    outStream.writeUTF(ServerResponse.OK.name());
+    File devicesFile = new File("devices.txt");
+    if (!devicesFile.exists()) {
+      outStream.writeUTF(ServerResponse.NODATA.name());
+      outStream.flush();
+      return;
+    }
+
+    StringBuilder sb = new StringBuilder();
+    try (BufferedReader reader = new BufferedReader(new FileReader(devicesFile))) {
+      String line;
+      while ((line = reader.readLine()) != null) {
+        if (line.isBlank())
+          continue;
+        String[] parts = line.split(";");
+        if (parts.length < 5)
+          continue;
+        if (!parts[0].equalsIgnoreCase(homeName))
+          continue;
+        String device = parts[1];
+        ServerResponse perm = home.canAccessDevice(device, currentUser);
+        if (perm != ServerResponse.OK)
+          continue;
+        if (sb.length() > 0)
+          sb.append("|");
+        // keep full line so client sees home;device;value;res;timestamp
+        sb.append(line);
+      }
+    }
+
+    if (sb.length() == 0) {
+      outStream.writeUTF(ServerResponse.NODATA.name());
+    } else {
+      outStream.writeUTF(ServerResponse.OK.name() + ";" + sb.toString());
+    }
     outStream.flush();
   }
 
