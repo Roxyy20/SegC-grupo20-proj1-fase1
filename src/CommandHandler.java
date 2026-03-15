@@ -170,7 +170,7 @@ public class CommandHandler {
   }
 
   public void createHome(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
-    String name = inStream.readUTF();
+    String name = inStream.readUTF().trim();
     if (name.isBlank()) {
       outStream.writeUTF(ServerResponse.NOK.name());
       outStream.flush();
@@ -178,7 +178,8 @@ public class CommandHandler {
     }
 
     loadHomesFromDisk();
-    if (homes.containsKey(name.toLowerCase())) {
+    String key = name.toLowerCase();
+    if (homes.containsKey(key)) {
       System.out.println("Home '" + name + "' already exists.");
       outStream.writeUTF(ServerResponse.NOK.name());
       outStream.flush();
@@ -187,7 +188,7 @@ public class CommandHandler {
 
     Home record = new Home(name, currentUser);
     // inicializa todos os contadores de secção a 1 (próximo id disponível)
-    homes.put(name.toLowerCase(), record);
+    homes.put(key, record);
     saveHomesToDisk();
 
     System.out.println("Creating home '" + name + "'");
