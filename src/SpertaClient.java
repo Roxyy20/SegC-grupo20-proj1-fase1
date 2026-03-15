@@ -1,4 +1,6 @@
+import java.io.File;
 import java.io.IOException;
+import java.net.URL;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
@@ -34,6 +36,24 @@ public class SpertaClient {
       outStream = new ObjectOutputStream(clientSocket.getOutputStream());
       outStream.flush();
       inStream = new ObjectInputStream(clientSocket.getInputStream());
+
+      // attestation: send app name and size, wait for response
+      String appName = "SpertaClient";
+      long appSize = getAppSize();
+      outStream.writeUTF(appName);
+      outStream.writeLong(appSize);
+      outStream.flush();
+
+      String attestResp = inStream.readUTF();
+      if ("ATTESTATION FAILED".equalsIgnoreCase(attestResp)) {
+        System.out.println("ATTESTATION FAILED");
+        return;
+      } else if ("ATTESTATION OK".equalsIgnoreCase(attestResp)) {
+        System.out.println("ATTESTATION OK");
+      } else {
+        System.out.println("Unexpected attestation response: " + attestResp);
+        return;
+      }
 
       // send credentials
       outStream.writeUTF(args[1]);
@@ -73,6 +93,25 @@ public class SpertaClient {
     } catch (IOException e) {
       e.printStackTrace();
     }
+  }
+
+  private static long getAppSize() {
+    File src = new File("src/SpertaClient.java");
+    if (src.exists()) {
+      return src.length();
+    }
+    try {
+      URL url = SpertaClient.class.getResource("SpertaClient.class");
+      if (url != null && "file".equals(url.getProtocol())) {
+        File f = new File(url.getFile());
+        if (f.exists()) {
+          return f.length();
+        }
+      }
+    } catch (Exception e) {
+      // ignore and fall through
+    }
+    return 0L;
   }
 
   public static void printhelp() {

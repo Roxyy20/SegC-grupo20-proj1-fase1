@@ -1,4 +1,5 @@
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -8,6 +9,7 @@ import java.net.Socket;
 
 class ServerThread extends Thread {
   private Socket socket = null;
+  private static final String APP_FILE = "apps.txt";
 
   ServerThread(Socket inSoc) {
     socket = inSoc;
@@ -20,6 +22,11 @@ class ServerThread extends Thread {
         ObjectOutputStream outStream = new ObjectOutputStream(clientSocket.getOutputStream());
         ObjectInputStream inStream = new ObjectInputStream(clientSocket.getInputStream());) {
       outStream.flush();
+
+      ensureAppFile();
+      if (!handleAttestation(outStream, inStream)) {
+        return;
+      }
 
       String user = inStream.readUTF();
       String pass = inStream.readUTF();
@@ -123,6 +130,59 @@ class ServerThread extends Thread {
         outStream.flush();
         break;
       }
+    }
+  }
+
+  private boolean handleAttestation(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
+    String appName = inStream.readUTF();
+    long clientSize = inStream.readLong();
+    long expectedSize = readExpectedSize(appName);
+    if (expectedSize <= 0 || expectedSize != clientSize) {
+      outStream.writeUTF("ATTESTATION FAILED");
+      outStream.flush();
+      return false;
+    }
+    outStream.writeUTF("ATTESTATION OK");
+    outStream.flush();
+    return true;
+  }
+
+  private long readExpectedSize(String appName) {
+    File file = new File(APP_FILE);
+    if (!file.exists()) {
+      return -1;
+    }
+    try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+      String line;
+      while ((line = reader.readLine()) != null) {
+        if (line.isBlank())
+          continue;
+        String[] parts = line.split(":");
+        if (parts.length != 2)
+          continue;
+        if (parts[0].equalsIgnoreCase(appName)) {
+          try {
+            return Long.parseLong(parts[1]);
+          } catch (NumberFormatException e) {
+            return -1;
+          }
+        }
+      }
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    return -1;
+  }
+
+  private void ensureAppFile() {
+    File file = new File(APP_FILE);
+    if (file.exists())
+      return;
+    long size = new File("src/SpertaClient.java").length();
+    try (FileWriter writer = new FileWriter(file, false)) {
+      writer.write("SpertaClient:" + size + System.lineSeparator());
+    } catch (IOException e) {
+      e.printStackTrace();
     }
   }
 }
