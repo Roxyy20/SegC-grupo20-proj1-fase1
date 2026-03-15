@@ -99,11 +99,17 @@ public class Home {
 
     if (permission.equalsIgnoreCase("all")) {
       List<String> perms = new ArrayList<>();
-      perms.add("s");
+      for (Section s : Section.values()) {
+        String code = String.valueOf(s.name().charAt(0));
+        if (!perms.contains(code))
+          perms.add(code);
+      }
       permissions.put(user, perms);
     } else {
       List<String> perms = permissions.getOrDefault(user, new ArrayList<>());
-      perms.add(permission);
+      String code = String.valueOf(permission.charAt(0)).toUpperCase();
+      if (!perms.contains(code))
+        perms.add(code);
       permissions.put(user, perms);
     }
     return ServerResponse.OK;
@@ -133,7 +139,7 @@ public class Home {
       return ServerResponse.NOPERM;
 
     for (String p : userPerms)
-      if (p.equalsIgnoreCase(section) || p.equalsIgnoreCase("s") || p.equalsIgnoreCase("all"))
+      if (p.equalsIgnoreCase(section) || p.equalsIgnoreCase("all"))
         return ServerResponse.OK;
 
     return ServerResponse.NOPERM;
