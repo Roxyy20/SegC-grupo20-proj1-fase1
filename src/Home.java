@@ -120,12 +120,16 @@ public class Home {
     if (nextId == null || num < 1 || num >= nextId)
       return ServerResponse.NOD;
 
+    // owner can always control existing devices
+    if (owner.equals(user))
+      return ServerResponse.OK;
+
     List<String> userPerms = permissions.get(user);
     if (userPerms == null)
       return ServerResponse.NOPERM;
 
     for (String p : userPerms)
-      if (p.equalsIgnoreCase(section))
+      if (p.equalsIgnoreCase(section) || p.equalsIgnoreCase("s") || p.equalsIgnoreCase("all"))
         return ServerResponse.OK;
 
     return ServerResponse.NOPERM;

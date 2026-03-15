@@ -129,16 +129,14 @@ public class SpertaClient {
       System.out.println("Comando RD requer 2 argumentos: <hm> <s>");
       return;
     }
+    outStream.writeUTF(command);
     if (cmdEnum == Command.EC) {
-      String hm = parts[1];
-      String d = parts[2];
-      int intValue = Integer.parseInt(parts[3]);
-      outStream.writeUTF(hm);
-      outStream.writeUTF(d);
-      outStream.writeInt(intValue);
+      outStream.writeUTF(parts[1]); // home
+      outStream.writeUTF(parts[2]); // device
+      outStream.writeInt(Integer.parseInt(parts[3])); // value
     } else {
-      for (String part : parts) {
-        outStream.writeUTF(part);
+      for (int i = 1; i < parts.length; i++) {
+        outStream.writeUTF(parts[i]);
       }
     }
     outStream.flush();

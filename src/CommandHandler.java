@@ -1,6 +1,7 @@
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -77,7 +78,22 @@ public class CommandHandler {
 
     outStream.writeUTF(res.name());
     outStream.flush();
-    // TODO implementar o txt
+    if (res == ServerResponse.OK) {
+      File logFile = new File(homeName + ".txt");
+      try (FileWriter writer = new FileWriter(logFile, true)) {
+        writer.write(String.format("%d;%s;%s;%d;%s%n", System.currentTimeMillis(), currentUser, device, value,
+            res.name()));
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+      File deviceLog = new File(homeName + "_" + device + ".txt");
+      try (FileWriter writer = new FileWriter(deviceLog, true)) {
+        writer.write(String.format("%d;%s;%d;%s%n", System.currentTimeMillis(), currentUser, value, res.name()));
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+      updateLastStatesFile(homeName, device, value, res);
+    }
     System.out.printf("ligando dispositivo %s em %s por %d\n", device, home, value);
   }
 
@@ -204,6 +220,40 @@ public class CommandHandler {
     if (name == null)
       return null;
     return homes.get(name.toLowerCase());
+  }
+
+  private void updateLastStatesFile(String homeName, String device, int value, ServerResponse res) {
+    File file = new File("devices.txt");
+    Map<String, String> latest = new LinkedHashMap<>();
+    if (file.exists()) {
+      try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+        String line;
+        while ((line = reader.readLine()) != null) {
+          if (line.isBlank())
+            continue;
+          String[] parts = line.split(";");
+          if (parts.length < 2)
+            continue;
+          latest.put(parts[0].toLowerCase() + ";" + parts[1].toLowerCase(), line);
+        }
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+    }
+
+    String key = homeName.toLowerCase() + ";" + device.toLowerCase();
+    String newLine = String.format("%s;%s;%d;%s;%d", homeName, device, value, res.name(),
+        System.currentTimeMillis());
+    latest.put(key, newLine);
+
+    try (FileWriter writer = new FileWriter(file, false)) {
+      for (String line : latest.values()) {
+        writer.write(line);
+        writer.write(System.lineSeparator());
+      }
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
   }
 
 }
