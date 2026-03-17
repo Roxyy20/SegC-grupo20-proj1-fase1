@@ -5,6 +5,8 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -67,7 +69,7 @@ public class CommandHandler {
         if (line.isBlank())
           continue;
         String[] parts = line.split(";");
-        if (parts.length < 5)
+        if (parts.length < 3)
           continue;
         if (!parts[0].equalsIgnoreCase(homeName))
           continue;
@@ -111,9 +113,12 @@ public class CommandHandler {
     outStream.writeUTF(res.name());
     outStream.flush();
     if (res == ServerResponse.OK) { 
-      File deviceLog = new File(homeName + "_" + device + ".txt");
+      File deviceLog = new File(homeName + "_" + device + ".csv");
       try (FileWriter writer = new FileWriter(deviceLog, true)) {
-        writer.write(String.format("%s;%d;%s%n", currentUser, value, res.name()));
+        Date currentUserData = new Date();
+        String data = new SimpleDateFormat("yyyy-MM-dd").format(currentUserData);
+        String time = new SimpleDateFormat("HH:mm:ss").format(currentUserData);
+        writer.write(String.format("%s,%s,%s;%d", data, time, currentUser, value));
       } catch (IOException e) {
         e.printStackTrace();
       }
@@ -268,7 +273,7 @@ public class CommandHandler {
     }
 
     String key = homeName.toLowerCase() + ";" + device.toLowerCase();
-    String newLine = String.format("%s;%s;%d;%s", homeName, device, value, res.name());
+    String newLine = String.format("%s;%s;%d", homeName, device, value);
     latest.put(key, newLine);
 
     try (FileWriter writer = new FileWriter(file, false)) {
