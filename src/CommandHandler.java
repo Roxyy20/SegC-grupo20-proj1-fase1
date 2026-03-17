@@ -110,17 +110,10 @@ public class CommandHandler {
 
     outStream.writeUTF(res.name());
     outStream.flush();
-    if (res == ServerResponse.OK) {
-      File logFile = new File(homeName + ".txt");
-      try (FileWriter writer = new FileWriter(logFile, true)) {
-        writer.write(String.format("%d;%s;%s;%d;%s%n", System.currentTimeMillis(), currentUser, device, value,
-            res.name()));
-      } catch (IOException e) {
-        e.printStackTrace();
-      }
+    if (res == ServerResponse.OK) { 
       File deviceLog = new File(homeName + "_" + device + ".txt");
       try (FileWriter writer = new FileWriter(deviceLog, true)) {
-        writer.write(String.format("%d;%s;%d;%s%n", System.currentTimeMillis(), currentUser, value, res.name()));
+        writer.write(String.format("%s;%d;%s%n", currentUser, value, res.name()));
       } catch (IOException e) {
         e.printStackTrace();
       }
@@ -275,8 +268,7 @@ public class CommandHandler {
     }
 
     String key = homeName.toLowerCase() + ";" + device.toLowerCase();
-    String newLine = String.format("%s;%s;%d;%s;%d", homeName, device, value, res.name(),
-        System.currentTimeMillis());
+    String newLine = String.format("%s;%s;%d;%s", homeName, device, value, res.name());
     latest.put(key, newLine);
 
     try (FileWriter writer = new FileWriter(file, false)) {
