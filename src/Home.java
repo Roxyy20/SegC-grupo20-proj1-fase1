@@ -49,10 +49,9 @@ public class Home {
   }
 
   // returns list with lines
-  public File requestDeviceLog(String device) {
-    File logFile = new File(String.format("%s_%s.csv", name, device));
+  public List<String> requestDeviceLog(String device) {
     System.out.printf("Entregando log file do dispositivo %s casa\n", device, name);
-    return logFile;
+    return null;
   }
 
   // returns list of commands

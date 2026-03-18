@@ -1,6 +1,5 @@
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -9,6 +8,7 @@ import java.io.ObjectOutputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 public class CommandHandler {
@@ -38,20 +38,8 @@ public class CommandHandler {
     }
     Home home = getHome(homeName);
 
-    File logFile = home.requestDeviceLog(device);
-    long fileSize = logFile.exists() ? logFile.length() : 0;
+    List<String> lines = home.requestDeviceLog(device);
     outStream.writeUTF(ServerResponse.OK.name());
-    outStream.writeLong(fileSize);
-    byte[] buffer = new byte[4096];
-    try (FileInputStream fileInputStream = new FileInputStream(logFile)) {
-      int bytesRead;
-      while ((bytesRead = fileInputStream.read(buffer)) != -1) {
-        outStream.write(buffer, 0, bytesRead);
-      }
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
-    
     outStream.flush();
   }
 
