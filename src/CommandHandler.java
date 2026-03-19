@@ -87,7 +87,16 @@ public class CommandHandler {
     if (sb.length() == 0) {
       outStream.writeUTF(ServerResponse.NODATA.name());
     } else {
-      outStream.writeUTF(ServerResponse.OK.name() + ";" + sb.toString());
+      outStream.writeUTF(ServerResponse.OK.name());
+      
+      // converter string para bytes
+      byte[] data = sb.toString().getBytes();
+
+      // enviar tamanho (LONG)
+      outStream.writeLong(data.length);
+
+      // enviar conteúdo
+      outStream.write(data);
     }
     outStream.flush();
   }

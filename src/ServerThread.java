@@ -176,8 +176,6 @@ class ServerThread extends Thread {
 
   private void ensureAppFile() {
     File file = new File(APP_FILE);
-    if (file.exists())
-      return;
     long size = new File("src/SpertaClient.java").length();
     try (FileWriter writer = new FileWriter(file, false)) {
       writer.write("SpertaClient:" + size + System.lineSeparator());
