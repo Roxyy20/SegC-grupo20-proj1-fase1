@@ -1,1 +1,1 @@
-casaMelody:melody:M=1,L=2,P=2,G=1,S=1,E=1:roxy=P
+casaMelody:melody:M=1,L=3,P=3,G=1,S=1,E=1:roxy=P

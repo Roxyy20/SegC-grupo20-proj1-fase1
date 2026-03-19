@@ -1,5 +1,8 @@
+import java.io.BufferedWriter;
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -142,7 +145,7 @@ public class SpertaClient {
         receive_home_devices_file(mensagem[1]);
       }
       else if (mensagem[0].equals("RH")){
-        receive_device_log_file();
+        receive_device_log_file(mensagem[1], mensagem[2]);
       }
       else{
         receiveResponse();
@@ -257,8 +260,44 @@ public class SpertaClient {
     }
   }
 
-  private static void receive_device_log_file() throws IOException{
+  private static void receive_device_log_file(String home, String device) throws IOException{
     String response = inStream.readUTF();
     System.out.println("Resposta do servidor: " + response);
+
+    if (response.equals("OK")) {
+
+        // Abrir ficheiro para gravar
+        BufferedWriter writer = new BufferedWriter(new FileWriter(home + "_" + device + "_log.csv"));
+
+        try {
+            // Ler todas as linhas enviadas pelo servidor
+            while (true) {
+                String line = inStream.readUTF();
+                writer.write(line);
+                writer.newLine();
+            }
+        } catch (EOFException e) {
+            // Chegou ao fim do stream → terminado
+        }
+
+        writer.close();
+        System.out.println("Ficheiro do dispositivo recebido com sucesso!");
+
+    } else {
+        // tratar erros
+        switch (response) {
+            case "NODATA":
+                System.out.println("Sem dados disponíveis para este dispositivo.");
+                break;
+            case "NOHM":
+                System.out.println("Casa não existe.");
+                break;
+            case "NOPERM":
+                System.out.println("Sem permissões para este dispositivo.");
+                break;
+            default:
+                System.out.println("Resposta desconhecida do servidor.");
+        }
+    }
   }
 }

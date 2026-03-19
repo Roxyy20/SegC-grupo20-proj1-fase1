@@ -36,10 +36,27 @@ public class CommandHandler {
       outStream.flush();
       return;
     }
+
     Home home = getHome(homeName);
 
-    List<String> lines = home.requestDeviceLog(device);
+    File deviceLogFile = home.requestDeviceLog(device);
+    if (!deviceLogFile.exists()) {
+      outStream.writeUTF(ServerResponse.NODATA.name());
+      outStream.flush();
+      return;
+    }
     outStream.writeUTF(ServerResponse.OK.name());
+    long fileSize = deviceLogFile.length();
+    outStream.writeLong(fileSize);
+    try (FileReader fileReader = new FileReader(deviceLogFile);
+        BufferedReader bufferedReader = new BufferedReader(fileReader)) {
+      String line;
+      while ((line = bufferedReader.readLine()) != null) {
+        outStream.writeUTF(line);
+      }
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
     outStream.flush();
   }
 
