@@ -72,8 +72,6 @@ public class Home {
     if (!ServerResponse.OK.equals(perm))
       return perm;
 
-    // change device state
-
     return ServerResponse.OK;
   }
 

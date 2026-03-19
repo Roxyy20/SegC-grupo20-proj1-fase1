@@ -141,13 +141,11 @@ public class SpertaClient {
       System.out.print("Ação pretendida: ");
       String[] mensagem = sc.nextLine().split(" ");
       sendCommand(mensagem);
-      if(mensagem[0].equals("RT")){
+      if (mensagem[0].equals("RT")) {
         receive_home_devices_file(mensagem[1]);
-      }
-      else if (mensagem[0].equals("RH")){
+      } else if (mensagem[0].equals("RH")) {
         receive_device_log_file(mensagem[1], mensagem[2]);
-      }
-      else{
+      } else {
         receiveResponse();
       }
     }
@@ -221,15 +219,14 @@ public class SpertaClient {
   private static void receiveResponse() throws IOException {
     String response = inStream.readUTF();
     System.out.println("Resposta do servidor: " + response);
-    
+
   }
 
   private static void receive_home_devices_file(String home) throws IOException {
     String response = inStream.readUTF();
     System.out.println("Resposta do servidor: " + response);
-    if(response.equalsIgnoreCase(ServerResponse.OK.name())){
+    if (response.equalsIgnoreCase(ServerResponse.OK.name())) {
       long fileSize = inStream.readLong();
-      byte[] data = new byte[(int) fileSize];
 
       // 2. Preparar ficheiro
       FileOutputStream fos = new FileOutputStream("devices_" + home + "_recebido.txt");
@@ -239,65 +236,64 @@ public class SpertaClient {
 
       // 3. Ler exatamente o número de bytes esperado
       while (totalRead < fileSize) {
-          int bytesToRead = (int) Math.min(buffer.length, fileSize - totalRead);
-          int bytesRead = inStream.read(buffer, 0, bytesToRead);
+        int bytesToRead = (int) Math.min(buffer.length, fileSize - totalRead);
+        int bytesRead = inStream.read(buffer, 0, bytesToRead);
 
-          if (bytesRead == -1) break;
+        if (bytesRead == -1)
+          break;
 
-          fos.write(buffer, 0, bytesRead);
-          totalRead += bytesRead;
-        }
+        fos.write(buffer, 0, bytesRead);
+        totalRead += bytesRead;
+      }
 
       fos.close();
 
-        System.out.println("Ficheiro recebido com sucesso!");
-    }
-    else if(response.equalsIgnoreCase(ServerResponse.NOHM.name())){
+      System.out.println("Ficheiro recebido com sucesso!");
+    } else if (response.equalsIgnoreCase(ServerResponse.NOHM.name())) {
       System.out.println("Casa não existe");
-    }
-    else if(response.equalsIgnoreCase(ServerResponse.NODATA.name())){
+    } else if (response.equalsIgnoreCase(ServerResponse.NODATA.name())) {
       System.out.println("Sem dados");
     }
   }
 
-  private static void receive_device_log_file(String home, String device) throws IOException{
+  private static void receive_device_log_file(String home, String device) throws IOException {
     String response = inStream.readUTF();
     System.out.println("Resposta do servidor: " + response);
 
     if (response.equals("OK")) {
 
-        // Abrir ficheiro para gravar
-        BufferedWriter writer = new BufferedWriter(new FileWriter(home + "_" + device + "_log.csv"));
+      // Abrir ficheiro para gravar
+      BufferedWriter writer = new BufferedWriter(new FileWriter(home + "_" + device + "_log.csv"));
 
-        try {
-            // Ler todas as linhas enviadas pelo servidor
-            while (true) {
-                String line = inStream.readUTF();
-                writer.write(line);
-                writer.newLine();
-            }
-        } catch (EOFException e) {
-            // Chegou ao fim do stream → terminado
+      try {
+        // Ler todas as linhas enviadas pelo servidor
+        while (true) {
+          String line = inStream.readUTF();
+          writer.write(line);
+          writer.newLine();
         }
+      } catch (EOFException e) {
+        // Chegou ao fim do stream → terminado
+      }
 
-        writer.close();
-        System.out.println("Ficheiro do dispositivo recebido com sucesso!");
+      writer.close();
+      System.out.println("Ficheiro do dispositivo recebido com sucesso!");
 
     } else {
-        // tratar erros
-        switch (response) {
-            case "NODATA":
-                System.out.println("Sem dados disponíveis para este dispositivo.");
-                break;
-            case "NOHM":
-                System.out.println("Casa não existe.");
-                break;
-            case "NOPERM":
-                System.out.println("Sem permissões para este dispositivo.");
-                break;
-            default:
-                System.out.println("Resposta desconhecida do servidor.");
-        }
+      // tratar erros
+      switch (response) {
+        case "NODATA":
+          System.out.println("Sem dados disponíveis para este dispositivo.");
+          break;
+        case "NOHM":
+          System.out.println("Casa não existe.");
+          break;
+        case "NOPERM":
+          System.out.println("Sem permissões para este dispositivo.");
+          break;
+        default:
+          System.out.println("Resposta desconhecida do servidor.");
+      }
     }
   }
 }

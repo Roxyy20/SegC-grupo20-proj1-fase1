@@ -37,6 +37,6 @@ to run the client:
 - [x] Create
 - [x] Add
 - [x] RD
-- [ ] RT
-- [ ] RH
-- [ ] EC
+- [x] RT
+- [x] RH
+- [x] EC

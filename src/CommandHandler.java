@@ -8,7 +8,6 @@ import java.io.ObjectOutputStream;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Map;
 
 public class CommandHandler {
@@ -16,10 +15,6 @@ public class CommandHandler {
   private static final String HOMES_FILE = "homes.txt";
   private static final Map<String, Home> homes = new LinkedHashMap<>();
   private final String currentUser;
-
-  // static {
-  // loadHomesFromDisk();
-  // }
 
   public CommandHandler(String user) {
     currentUser = user;
@@ -105,7 +100,7 @@ public class CommandHandler {
       outStream.writeUTF(ServerResponse.NODATA.name());
     } else {
       outStream.writeUTF(ServerResponse.OK.name());
-      
+
       // converter string para bytes
       byte[] data = sb.toString().getBytes();
 
@@ -134,21 +129,20 @@ public class CommandHandler {
     Home home = getHome(homeName);
 
     ServerResponse res = home.setStateOrTimer(device, value, currentUser);
-    saveHomesToDisk();
 
     outStream.writeUTF(res.name());
     outStream.flush();
-    if (res == ServerResponse.OK) { 
+    if (res == ServerResponse.OK) {
       File deviceLog = new File(homeName + "_" + device + ".csv");
       try (FileWriter writer = new FileWriter(deviceLog, true)) {
         Date currentUserData = new Date();
         String data = new SimpleDateFormat("yyyy-MM-dd").format(currentUserData);
         String time = new SimpleDateFormat("HH:mm:ss").format(currentUserData);
-        writer.write(String.format("%s,%s,%s;%d", data, time, currentUser, value));
+        writer.write(String.format("%s,%s,%s,%d", data, time, currentUser, value));
       } catch (IOException e) {
         e.printStackTrace();
       }
-      updateLastStatesFile(homeName, device, value, res);
+      updateLastStatesFile(homeName, device, value);
     }
     System.out.printf("ligando dispositivo %s em %s por %d\n", device, home, value);
   }
@@ -279,7 +273,7 @@ public class CommandHandler {
     return homes.get(name.toLowerCase());
   }
 
-  private void updateLastStatesFile(String homeName, String device, int value, ServerResponse res) {
+  private void updateLastStatesFile(String homeName, String device, int value) {
     File file = new File("devices.txt");
     Map<String, String> latest = new LinkedHashMap<>();
     if (file.exists()) {
