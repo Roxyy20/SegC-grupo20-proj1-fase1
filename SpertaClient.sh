@@ -1,1 +1,1 @@
-java -cp src SpertaClient "$@"
+java -jar build/SpertaClient.jar "$@"
