@@ -219,7 +219,31 @@ public class SpertaClient {
   private static void receiveResponse() throws IOException {
     String response = inStream.readUTF();
     System.out.println("Resposta do servidor: " + response);
-
+    switch (response) {
+      case "OK":
+        System.out.println("Ok, operação efetuada com sucesso.");
+        break;
+      case "NOK":
+        System.out.println("Ocorreu algum erro durante a operação.");
+        break;
+      case "NODATA":
+        System.out.println("Sem dados disponíveis para este dispositivo.");
+        break;
+      case "NOPERM":
+        System.out.println("Sem permissões para este dispositivo.");
+        break;
+      case "NOHM":
+        System.out.println("Casa não existe.");
+        break;
+      case "NOD":
+        System.out.println("Device não existe.");
+        break;
+      case "NOUSER":
+        System.out.println("User não existe.");
+        break;
+      default:
+        System.out.println("Resposta desconhecida do servidor.");
+    }
   }
 
   private static void receive_home_devices_file(String home) throws IOException {
