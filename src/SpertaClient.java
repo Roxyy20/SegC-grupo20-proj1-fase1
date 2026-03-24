@@ -253,7 +253,13 @@ public class SpertaClient {
       long fileSize = inStream.readLong();
 
       // 2. Preparar ficheiro
-      FileOutputStream fos = new FileOutputStream("devices_" + home + "_recebido.txt");
+      File outputFile = new File("client/devices_" + home + "_recebido.txt");
+      File parent = outputFile.getParentFile();
+      if (parent != null && !parent.exists()) {
+        parent.mkdirs();
+      }
+
+      FileOutputStream fos = new FileOutputStream(outputFile);
 
       byte[] buffer = new byte[4096];
       long totalRead = 0;
@@ -287,7 +293,12 @@ public class SpertaClient {
     if (response.equals("OK")) {
 
       // Abrir ficheiro para gravar
-      BufferedWriter writer = new BufferedWriter(new FileWriter(home + "_" + device + "_log.csv"));
+      File outputFile = new File("client/" + home + "_" + device + "_log.csv");
+      File parent = outputFile.getParentFile();
+      if (parent != null && !parent.exists()) {
+        parent.mkdirs();
+      }
+      BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile));
 
       try {
         // Ler todas as linhas enviadas pelo servidor

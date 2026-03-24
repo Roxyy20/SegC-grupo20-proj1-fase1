@@ -50,7 +50,11 @@ public class Home {
 
   // returns list with lines
   public File requestDeviceLog(String device) {
-    File deviceLogFile = new File(name + "_" + device + ".csv");
+    File deviceLogFile = new File("server/" + name + "_" + device + ".csv");
+    File parent = deviceLogFile.getParentFile();
+    if (parent != null && !parent.exists()) {
+      parent.mkdirs();
+    }
     return deviceLogFile;
   }
 

@@ -6,6 +6,9 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 
 class ServerThread extends Thread {
   private Socket socket = null;
@@ -37,8 +40,15 @@ class ServerThread extends Thread {
         return;
       }
 
-      FileReader fileReader = new FileReader("users.txt");
-      BufferedReader buffReader = new BufferedReader(fileReader);
+      Path path = Paths.get("server/users.txt");
+
+      Files.createDirectories(path.getParent());
+
+      if (Files.notExists(path)) {
+        Files.createFile(path);
+      }
+
+      BufferedReader buffReader = Files.newBufferedReader(path);
       String line;
       Boolean found = false;
       while ((line = buffReader.readLine()) != null) {
@@ -61,7 +71,12 @@ class ServerThread extends Thread {
         outStream.writeObject(LoginMessage.OKUser);
       } else {
         outStream.writeObject(LoginMessage.OKNewUser);
-        FileWriter fileWriter = new FileWriter("users.txt", true);
+        File usersFile = new File("server/users.txt");
+        File parent = usersFile.getParentFile();
+        if (parent != null && !parent.exists()) {
+          parent.mkdirs();
+        }
+        FileWriter fileWriter = new FileWriter(usersFile, true);
         fileWriter.write(user + ":" + pass + "\n");
         fileWriter.close();
       }

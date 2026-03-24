@@ -67,7 +67,11 @@ public class CommandHandler {
     }
     Home home = getHome(homeName);
 
-    File devicesFile = new File("devices.txt");
+    File devicesFile = new File("server/devices.txt");
+    File parent = devicesFile.getParentFile();
+    if (parent != null && !parent.exists()) {
+      parent.mkdirs();
+    }
     if (!devicesFile.exists()) {
       outStream.writeUTF(ServerResponse.NODATA.name());
       outStream.flush();
@@ -133,7 +137,11 @@ public class CommandHandler {
     outStream.writeUTF(res.name());
     outStream.flush();
     if (res == ServerResponse.OK) {
-      File deviceLog = new File(homeName + "_" + device + ".csv");
+      File deviceLog = new File("server/" + homeName + "_" + device + ".csv");
+      File parent = deviceLog.getParentFile();
+      if (parent != null && !parent.exists()) {
+        parent.mkdirs();
+      }
       try (FileWriter writer = new FileWriter(deviceLog, true)) {
         Date currentUserData = new Date();
         String data = new SimpleDateFormat("yyyy-MM-dd").format(currentUserData);
@@ -194,7 +202,11 @@ public class CommandHandler {
   }
 
   private static Boolean userExists(String user) {
-    File usersFile = new File("users.txt");
+    File usersFile = new File("server/users.txt");
+    File parent = usersFile.getParentFile();
+    if (parent != null && !parent.exists()) {
+      parent.mkdirs();
+    }
     if (!usersFile.exists()) {
       return false;
     }
@@ -274,7 +286,11 @@ public class CommandHandler {
   }
 
   private void updateLastStatesFile(String homeName, String device, int value) {
-    File file = new File("devices.txt");
+    File file = new File("server/devices.txt");
+    File parent = file.getParentFile();
+    if (parent != null && !parent.exists()) {
+      parent.mkdirs();
+    }
     Map<String, String> latest = new LinkedHashMap<>();
     if (file.exists()) {
       try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
