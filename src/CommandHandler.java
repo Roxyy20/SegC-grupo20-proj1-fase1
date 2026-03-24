@@ -43,17 +43,9 @@ public class CommandHandler {
       return;
     }
     outStream.writeUTF(ServerResponse.OK.name());
-    long fileSize = deviceLogFile.length();
-    outStream.writeLong(fileSize);
-    try (FileReader fileReader = new FileReader(deviceLogFile);
-        BufferedReader bufferedReader = new BufferedReader(fileReader)) {
-      String line;
-      while ((line = bufferedReader.readLine()) != null) {
-        outStream.writeUTF(line);
-      }
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
+    byte[] data = java.nio.file.Files.readAllBytes(deviceLogFile.toPath());
+    outStream.writeLong(data.length);
+    outStream.write(data);
     outStream.flush();
   }
 

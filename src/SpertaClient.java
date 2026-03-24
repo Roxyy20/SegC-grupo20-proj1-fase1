@@ -161,7 +161,6 @@ public class SpertaClient {
   private static boolean sendCommand(String[] parts) throws IOException {
     String command = parts[0];
     Command cmdEnum = Command.fromString(command);
-    System.out.println(cmdEnum);
     if (cmdEnum == null) {
       System.out.println("Comando não existe");
       return false;
@@ -226,39 +225,15 @@ public class SpertaClient {
 
   private static void receiveResponse() throws IOException {
     String response = inStream.readUTF();
-    System.out.println("Resposta do servidor: " + response);
-    switch (response) {
-      case "OK":
-        System.out.println("Ok, operação efetuada com sucesso.");
-        break;
-      case "NOK":
-        System.out.println("Ocorreu algum erro durante a operação.");
-        break;
-      case "NODATA":
-        System.out.println("Sem dados disponíveis para este dispositivo.");
-        break;
-      case "NOPERM":
-        System.out.println("Sem permissões para este dispositivo.");
-        break;
-      case "NOHM":
-        System.out.println("Casa não existe.");
-        break;
-      case "NOD":
-        System.out.println("Device não existe.");
-        break;
-      case "NOUSER":
-        System.out.println("User não existe.");
-        break;
-      default:
-        System.out.println("Resposta desconhecida do servidor.");
-    }
+    // Mostrar apenas a resposta crua (ex.: NOHM)
+    System.out.println(response);
   }
 
   private static void receive_home_devices_file(String home) throws IOException {
     String response = inStream.readUTF();
-    System.out.println("Resposta do servidor: " + response);
     if (response.equalsIgnoreCase(ServerResponse.OK.name())) {
       long fileSize = inStream.readLong();
+      System.out.printf("OK, %d (long).%n", fileSize);
 
       // 2. Preparar ficheiro
       File outputFile = new File("client/devices_" + home + "_recebido.txt");
@@ -268,6 +243,7 @@ public class SpertaClient {
       }
 
       FileOutputStream fos = new FileOutputStream(outputFile);
+      java.io.ByteArrayOutputStream memoryCopy = new java.io.ByteArrayOutputStream((int) fileSize);
 
       byte[] buffer = new byte[4096];
       long totalRead = 0;
@@ -281,10 +257,16 @@ public class SpertaClient {
           break;
 
         fos.write(buffer, 0, bytesRead);
+        memoryCopy.write(buffer, 0, bytesRead);
         totalRead += bytesRead;
       }
 
       fos.close();
+
+      // Mostrar conteúdo recebido no terminal
+      String content = memoryCopy.toString();
+      System.out.println("Conteúdo recebido:");
+      System.out.println(content);
 
       System.out.println("Ficheiro recebido com sucesso!");
     } else if (response.equalsIgnoreCase(ServerResponse.NOHM.name())) {
@@ -296,9 +278,9 @@ public class SpertaClient {
 
   private static void receive_device_log_file(String home, String device) throws IOException {
     String response = inStream.readUTF();
-    System.out.println("Resposta do servidor: " + response);
-
     if (response.equals("OK")) {
+      long fileSize = inStream.readLong();
+      System.out.printf("OK, %d (long).%n", fileSize);
 
       // Abrir ficheiro para gravar
       File outputFile = new File("client/" + home + "_" + device + "_log.csv");
@@ -306,20 +288,25 @@ public class SpertaClient {
       if (parent != null && !parent.exists()) {
         parent.mkdirs();
       }
-      BufferedWriter writer = new BufferedWriter(new FileWriter(outputFile));
+      FileOutputStream fos = new FileOutputStream(outputFile);
+      java.io.ByteArrayOutputStream memoryCopy = new java.io.ByteArrayOutputStream((int) fileSize);
 
-      try {
-        // Ler todas as linhas enviadas pelo servidor
-        while (true) {
-          String line = inStream.readUTF();
-          writer.write(line);
-          writer.newLine();
-        }
-      } catch (EOFException e) {
-        // Chegou ao fim do stream → terminado
+      byte[] buffer = new byte[4096];
+      long totalRead = 0;
+      while (totalRead < fileSize) {
+        int toRead = (int) Math.min(buffer.length, fileSize - totalRead);
+        int read = inStream.read(buffer, 0, toRead);
+        if (read == -1)
+          break;
+        fos.write(buffer, 0, read);
+        memoryCopy.write(buffer, 0, read);
+        totalRead += read;
       }
 
-      writer.close();
+      fos.close();
+
+      System.out.println("Conteúdo recebido:");
+      System.out.println(memoryCopy.toString());
       System.out.println("Ficheiro do dispositivo recebido com sucesso!");
 
     } else {
