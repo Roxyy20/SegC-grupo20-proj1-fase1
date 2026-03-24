@@ -155,6 +155,7 @@ public class SpertaClient {
   private static void sendCommand(String[] parts) throws IOException {
     String command = parts[0];
     Command cmdEnum = Command.fromString(command);
+    System.out.println(cmdEnum);
     if (cmdEnum == null) {
       System.out.println("Comando não existe");
       return;
