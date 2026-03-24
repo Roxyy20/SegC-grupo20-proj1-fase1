@@ -108,8 +108,18 @@ public class Home {
       }
       permissions.put(user, perms);
     } else {
+      Section section = Section.parseSection(permission);
+      if (section == null)
+        return ServerResponse.NOK; // secção inexistente
+
       List<String> perms = permissions.getOrDefault(user, new ArrayList<>());
-      String code = String.valueOf(permission.charAt(0)).toUpperCase();
+
+      // Se o utilizador tinha ALL (ou lista completa), substitui pelas novas permissões
+      if (perms.size() == Section.values().length) {
+        perms = new ArrayList<>();
+      }
+
+      String code = String.valueOf(section.name().charAt(0));
       if (!perms.contains(code))
         perms.add(code);
       permissions.put(user, perms);
@@ -188,6 +198,10 @@ public class Home {
 
   public synchronized static void saveHomesToDisk(Collection<Home> homes, String filename) {
     File homesFile = new File(filename);
+    File parent = homesFile.getParentFile();
+    if (parent != null && !parent.exists()) {
+      parent.mkdirs();
+    }
     try (FileWriter writer = new FileWriter(homesFile, false)) {
       for (Home home : homes) {
         StringBuilder sb = new StringBuilder();

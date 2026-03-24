@@ -12,7 +12,7 @@ import java.nio.file.Paths;
 
 class ServerThread extends Thread {
   private Socket socket = null;
-  private static final String APP_FILE = "apps.txt";
+  private static final String APP_FILE = "server/apps.txt";
 
   ServerThread(Socket inSoc) {
     socket = inSoc;
@@ -191,6 +191,21 @@ class ServerThread extends Thread {
 
   private void ensureAppFile() {
     File file = new File(APP_FILE);
+    File parent = file.getParentFile();
+    if (parent != null && !parent.exists()) {
+      parent.mkdirs();
+    }
+
+    // migrate legacy location if needed
+    File legacy = new File("apps.txt");
+    if (!file.exists() && legacy.exists() && !legacy.equals(file)) {
+      try {
+        Files.move(legacy.toPath(), file.toPath());
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+    }
+
     long size = new File("src/SpertaClient.java").length();
     try (FileWriter writer = new FileWriter(file, false)) {
       writer.write("SpertaClient:" + size + System.lineSeparator());

@@ -5,6 +5,8 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedHashMap;
@@ -12,7 +14,7 @@ import java.util.Map;
 
 public class CommandHandler {
 
-  private static final String HOMES_FILE = "homes.txt";
+  private static final String HOMES_FILE = "server/homes.txt";
   private static final Map<String, Home> homes = new LinkedHashMap<>();
   private final String currentUser;
 
@@ -268,6 +270,7 @@ public class CommandHandler {
    * inicial; se o ficheiro não existir, o cache fica vazio.
    */
   private static void loadHomesFromDisk() {
+    ensureHomesFile();
     homes.clear();
     homes.putAll(Home.loadHomesFromDisk(HOMES_FILE));
   }
@@ -276,6 +279,7 @@ public class CommandHandler {
    * Persiste o cache atual para o ficheiro homes.txt de uma só vez.
    */
   private static void saveHomesToDisk() {
+    ensureHomesFile();
     Home.saveHomesToDisk(homes.values(), HOMES_FILE);
   }
 
@@ -283,6 +287,39 @@ public class CommandHandler {
     if (name == null)
       return null;
     return homes.get(name.toLowerCase());
+  }
+
+  /**
+   * Garante que o ficheiro homes.txt está na pasta do servidor e que a pasta existe.
+   * Se existir um ficheiro legacy na raiz, tenta movê-lo para a localização correta.
+   */
+  private static void ensureHomesFile() {
+    File homesFile = new File(HOMES_FILE);
+    File parent = homesFile.getParentFile();
+    if (parent != null && !parent.exists()) {
+      parent.mkdirs();
+    }
+
+    if (homesFile.exists()) {
+      return;
+    }
+
+    File legacy = new File("homes.txt");
+    if (!legacy.equals(homesFile) && legacy.exists()) {
+      try {
+        Files.move(legacy.toPath(), homesFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
+        return;
+      } catch (IOException e) {
+        // fall through to create empty file
+        e.printStackTrace();
+      }
+    }
+
+    try {
+      homesFile.createNewFile();
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
   }
 
   private void updateLastStatesFile(String homeName, String device, int value) {
