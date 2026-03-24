@@ -20,7 +20,7 @@ class ServerThread extends Thread {
   }
 
   @Override
-  public void start() {
+  public void run() {
     try (Socket clientSocket = socket;
         ObjectOutputStream outStream = new ObjectOutputStream(clientSocket.getOutputStream());
         ObjectInputStream inStream = new ObjectInputStream(clientSocket.getInputStream());) {
