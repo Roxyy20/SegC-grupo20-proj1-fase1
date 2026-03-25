@@ -1,8 +1,5 @@
-import java.io.BufferedWriter;
-import java.io.EOFException;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -273,6 +270,10 @@ public class SpertaClient {
       System.out.println("Casa não existe");
     } else if (response.equalsIgnoreCase(ServerResponse.NODATA.name())) {
       System.out.println("Sem dados");
+    } else if (response.equalsIgnoreCase(ServerResponse.NOPERM.name())) {
+      System.out.println("Sem permissões para esta casa.");
+    } else {
+      System.out.println("Resposta desconhecida do servidor.");
     }
   }
 
@@ -320,6 +321,9 @@ public class SpertaClient {
           break;
         case "NOPERM":
           System.out.println("Sem permissões para este dispositivo.");
+          break;
+        case "NOD":
+          System.out.println("O dispositivo não existe");
           break;
         default:
           System.out.println("Resposta desconhecida do servidor.");

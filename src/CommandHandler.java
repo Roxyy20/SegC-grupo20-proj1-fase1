@@ -36,6 +36,13 @@ public class CommandHandler {
 
     Home home = getHome(homeName);
 
+    ServerResponse perm = home.canAccessDevice(device, currentUser);
+    if (!ServerResponse.OK.equals(perm)) {
+      outStream.writeUTF(perm.name());
+      outStream.flush();
+      return;
+    }
+
     File deviceLogFile = home.requestDeviceLog(device);
     if (!deviceLogFile.exists()) {
       outStream.writeUTF(ServerResponse.NODATA.name());
@@ -60,6 +67,13 @@ public class CommandHandler {
       return;
     }
     Home home = getHome(homeName);
+
+    ServerResponse housePerm = home.canAccessHome(currentUser);
+    if (!ServerResponse.OK.equals(housePerm)) {
+      outStream.writeUTF(housePerm.name());
+      outStream.flush();
+      return;
+    }
 
     File devicesFile = new File("server/devices.txt");
     File parent = devicesFile.getParentFile();
@@ -190,7 +204,8 @@ public class CommandHandler {
     ServerResponse res = home.addPermission(user, permission, currentUser);
     saveHomesToDisk();
 
-    System.out.println("Usuario " + user + " adicionado com permissão " + permission + " à " + home);
+    // System.out.println("Usuario " + user + " adicionado com permissão " +
+    // permission + " à " + home);
     outStream.writeUTF(res.name());
     outStream.flush();
   }
@@ -282,8 +297,10 @@ public class CommandHandler {
   }
 
   /**
-   * Garante que o ficheiro homes.txt está na pasta do servidor e que a pasta existe.
-   * Se existir um ficheiro legacy na raiz, tenta movê-lo para a localização correta.
+   * Garante que o ficheiro homes.txt está na pasta do servidor e que a pasta
+   * existe.
+   * Se existir um ficheiro legacy na raiz, tenta movê-lo para a localização
+   * correta.
    */
   private static void ensureHomesFile() {
     File homesFile = new File(HOMES_FILE);

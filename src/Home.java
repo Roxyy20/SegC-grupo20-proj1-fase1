@@ -114,7 +114,8 @@ public class Home {
 
       List<String> perms = permissions.getOrDefault(user, new ArrayList<>());
 
-      // Se o utilizador tinha ALL (ou lista completa), substitui pelas novas permissões
+      // Se o utilizador tinha ALL (ou lista completa), substitui pelas novas
+      // permissões
       if (perms.size() == Section.values().length) {
         perms = new ArrayList<>();
       }
@@ -125,6 +126,17 @@ public class Home {
       permissions.put(user, perms);
     }
     return ServerResponse.OK;
+  }
+
+  public ServerResponse canAccessHome(String user) {
+    if (owner.equals(user))
+      return ServerResponse.OK;
+
+    List<String> userPerms = permissions.get(user);
+    if (userPerms == null)
+      return ServerResponse.NOPERM;
+
+    return ServerResponse.NOPERM;
   }
 
   private ServerResponse findDeviceAndPermission(String device, String user) {
