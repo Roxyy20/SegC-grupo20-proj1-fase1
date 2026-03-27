@@ -181,7 +181,6 @@ public class CommandHandler {
       }
       updateLastStatesFile(homeName, device, value, currentUser);
     }
-    System.out.printf("ligando dispositivo %s em %s por %d\n", device, home, value);
   }
 
   /**
