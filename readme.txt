@@ -4,7 +4,6 @@ Projeto 1 - Segurança e Confiabilidade
 - Requisitos: JDK 21.0.7 (OpenJDK), bash, `javac`, `jar`.
 - Comando: `./build.sh`
 - Saída: `build/SpertaServer.jar` e `build/SpertaClient.jar` ficam prontos para execução.
-- Maven: não é usado neste projeto (sem `pom.xml`).
 
 2) Execução
 - Servidor: `./SpertaServer.sh [<port>]` (porta por defeito: 22345).
