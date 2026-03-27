@@ -1,4 +1,6 @@
 casaRoxy:roxy:M=1,L=2,P=1,G=1,S=1,E=1:melody=M,L,P,G,S,E:mito=S:bowser=L
 casa:bowser:M=1,L=1,P=1,G=1,S=1,E=1:roxy=L
+casairon:bowser:M=1,L=1,P=1,G=1,S=1,E=1:roxy=L
 casaMelody:melody:M=1,L=2,P=1,G=1,S=1,E=1
+casaloreal:bowser:M=1,L=1,P=1,G=1,S=1,E=1:roxy=L
 casaMito:mito:M=1,L=1,P=1,G=2,S=1,E=1:melody=L:roxy=M,L,P,G,S,E

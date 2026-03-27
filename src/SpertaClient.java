@@ -77,18 +77,18 @@ public class SpertaClient {
       outStream.writeUTF(args[2]);
       outStream.flush();
 
-      String msg = inStream.readUTF();
+      LoginMessage msg = LoginMessage.valueOf(inStream.readUTF());
       switch (msg) {
-        case "WRONG-PWD":
+        case WrongPassword:
           System.out.println("Wrong password");
           tryNewPassword();
           break;
-        case "OK-NEW-USER":
+        case OKNewUser:
           System.out.println("Ok. You are a new user");
           printhelp();
           readCommands();
           break;
-        case "OK-USER":
+        case OKUser:
           System.out.println("OK, Welcome back");
           printhelp();
           readCommands();
@@ -239,8 +239,8 @@ public class SpertaClient {
       String newPassword = STDIN.nextLine();
       outStream.writeUTF(newPassword);
       outStream.flush();
-      String msg = inStream.readUTF();
-      if ("WRONG-PWD".equals(msg)) {
+      LoginMessage msg = LoginMessage.valueOf(inStream.readUTF());
+      if (msg == LoginMessage.WrongPassword) {
         System.out.println("Wrong password.");
       } else {
         break;
@@ -270,7 +270,7 @@ public class SpertaClient {
    */
   private static void receive_home_devices_file(String home) throws IOException {
     String response = inStream.readUTF();
-    if (response.equalsIgnoreCase(ServerResponse.OK.name())) {
+    if (response.equalsIgnoreCase("OK")) {
       long fileSize = inStream.readLong();
       System.out.printf("OK, %d (long).%n", fileSize);
 
@@ -308,11 +308,11 @@ public class SpertaClient {
       System.out.println(content);
 
       System.out.println("Ficheiro recebido com sucesso!");
-    } else if (response.equalsIgnoreCase(ServerResponse.NOHM.name())) {
+    } else if (response.equalsIgnoreCase("NOHM")) {
       System.out.println("Casa não existe");
-    } else if (response.equalsIgnoreCase(ServerResponse.NODATA.name())) {
+    } else if (response.equalsIgnoreCase("NODATA")) {
       System.out.println("Sem dados");
-    } else if (response.equalsIgnoreCase(ServerResponse.NOPERM.name())) {
+    } else if (response.equalsIgnoreCase("NOPERM")) {
       System.out.println("Sem permissões para esta casa.");
     } else {
       System.out.println("Resposta desconhecida do servidor.");

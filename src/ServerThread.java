@@ -50,7 +50,7 @@ class ServerThread extends Thread {
       String pass = inStream.readUTF();
 
       if (user.isBlank() || pass.isBlank() || user.contains(":") || pass.contains(":")) {
-        outStream.writeUTF("WRONG-PWD");
+        outStream.writeUTF(LoginMessage.WrongPassword.name());
         outStream.flush();
         return;
       }
@@ -66,26 +66,35 @@ class ServerThread extends Thread {
       BufferedReader buffReader = Files.newBufferedReader(path);
       String line;
       Boolean found = false;
+      boolean authenticated = false;
       while ((line = buffReader.readLine()) != null) {
         String[] values = line.split(":");
         String username = values[0];
         String password = values[1];
-          if (username.equals(user)) {
-            found = true;
-            if (!password.equals(pass)) {
-              outStream.writeUTF("WRONG-PWD");
-              outStream.flush();
-              buffReader.close();
-              readNewPassword(outStream, inStream, password);
-            }
-            break;
+        if (username.equals(user)) {
+          found = true;
+          if (!password.equals(pass)) {
+            outStream.writeUTF(LoginMessage.WrongPassword.name());
+            outStream.flush();
+            buffReader.close();
+            readNewPassword(outStream, inStream, password);
+            authenticated = true; // nova password válida já confirmada
+          } else {
+            authenticated = true; // password original correta
           }
+          break;
+        }
       }
       buffReader.close();
       if (found) {
-        outStream.writeUTF("OK-USER");
+        if (!authenticated) {
+          // não deve acontecer, mas evitar enviar estado errado
+          outStream.writeUTF(LoginMessage.WrongPassword.name());
+        } else {
+        outStream.writeUTF(LoginMessage.OKUser.name());
+        }
       } else {
-        outStream.writeUTF("OK-NEW-USER");
+        outStream.writeUTF(LoginMessage.OKNewUser.name());
         File usersFile = new File("server/users.txt");
         File parent = usersFile.getParentFile();
         if (parent != null && !parent.exists()) {
@@ -152,16 +161,15 @@ class ServerThread extends Thread {
       throws IOException {
     while (true) {
       String newPass = inStream.readUTF();
-      System.out.println("Received new password: " + newPass + " password: " + pass);
+      System.out.println("Received new password: " + newPass);
       System.out.println(newPass.equals(pass));
       if (!newPass.equals(pass)) {
-        System.out.println("Wrong password. Entrou no if");
-        outStream.writeUTF("WRONG-PWD");
+        System.out.println("Wrong password.");
+        outStream.writeUTF(LoginMessage.WrongPassword.name());
         outStream.flush();
-      } else if (newPass.equals(pass)) {
-        System.out.println("Password correct. Entrou no else");
-        outStream.writeUTF("OK-USER");
-        outStream.flush();
+      } else {
+        System.out.println("Password correct.");
+        // sinaliza sucesso sem enviar segunda resposta; quem chamou envia OKUser
         break;
       }
     }
