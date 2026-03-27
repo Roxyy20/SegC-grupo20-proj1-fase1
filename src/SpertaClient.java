@@ -17,6 +17,8 @@ public class SpertaClient {
   // streams used for sending commands to the server
   private static ObjectOutputStream outStream;
   private static ObjectInputStream inStream;
+  // scanner partilhado para evitar fechar System.in
+  private static final Scanner STDIN = new Scanner(System.in);
 
   /**
    * Ponto de entrada do cliente. Efetua a ligação ao servidor, trata a
@@ -160,12 +162,11 @@ public class SpertaClient {
    * @throws IOException se ocorrer erro de I/O na comunicação com o servidor
    */
   public static void readCommands() throws IOException {
-    Scanner sc = new Scanner(System.in);
     boolean running = true;
     while (running) {
       System.out.println("");
       System.out.print("Ação pretendida: ");
-      String[] mensagem = sc.nextLine().trim().split("\\s+");
+      String[] mensagem = STDIN.nextLine().trim().split("\\s+");
       if (mensagem.length == 0 || mensagem[0].isBlank())
         continue;
 
@@ -181,7 +182,6 @@ public class SpertaClient {
         receiveResponse();
       }
     }
-    sc.close();
   }
 
   /**
@@ -240,24 +240,22 @@ public class SpertaClient {
    * @throws IOException se falhar a comunicação com o servidor
    */
   private static void tryNewPassword() throws IOException {
-    try (Scanner sc = new Scanner(System.in)) {
-      while (true) {
-        System.out.print("Enter new password: ");
-        String newPassword = sc.nextLine();
-        outStream.writeUTF(newPassword);
-        outStream.flush();
-        LoginMessage msg;
-        try {
-          msg = (LoginMessage) inStream.readObject();
-        } catch (ClassNotFoundException e) {
-          e.printStackTrace();
-          return;
-        }
-        if (msg == LoginMessage.WrongPassword) {
-          System.out.println("Wrong password.");
-        } else {
-          break;
-        }
+    while (true) {
+      System.out.print("Enter new password: ");
+      String newPassword = STDIN.nextLine();
+      outStream.writeUTF(newPassword);
+      outStream.flush();
+      LoginMessage msg;
+      try {
+        msg = (LoginMessage) inStream.readObject();
+      } catch (ClassNotFoundException e) {
+        e.printStackTrace();
+        return;
+      }
+      if (msg == LoginMessage.WrongPassword) {
+        System.out.println("Wrong password.");
+      } else {
+        break;
       }
     }
     printhelp();
