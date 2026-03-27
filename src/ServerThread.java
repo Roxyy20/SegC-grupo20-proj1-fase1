@@ -50,7 +50,7 @@ class ServerThread extends Thread {
       String pass = inStream.readUTF();
 
       if (user.isBlank() || pass.isBlank() || user.contains(":") || pass.contains(":")) {
-        outStream.writeObject(LoginMessage.WrongPassword);
+        outStream.writeUTF("WRONG-PWD");
         outStream.flush();
         return;
       }
@@ -70,22 +70,22 @@ class ServerThread extends Thread {
         String[] values = line.split(":");
         String username = values[0];
         String password = values[1];
-        if (username.equals(user)) {
-          found = true;
-          if (!password.equals(pass)) {
-            outStream.writeObject(LoginMessage.WrongPassword);
-            outStream.flush();
-            buffReader.close();
-            readNewPassword(outStream, inStream, password);
+          if (username.equals(user)) {
+            found = true;
+            if (!password.equals(pass)) {
+              outStream.writeUTF("WRONG-PWD");
+              outStream.flush();
+              buffReader.close();
+              readNewPassword(outStream, inStream, password);
+            }
+            break;
           }
-          break;
-        }
       }
       buffReader.close();
       if (found) {
-        outStream.writeObject(LoginMessage.OKUser);
+        outStream.writeUTF("OK-USER");
       } else {
-        outStream.writeObject(LoginMessage.OKNewUser);
+        outStream.writeUTF("OK-NEW-USER");
         File usersFile = new File("server/users.txt");
         File parent = usersFile.getParentFile();
         if (parent != null && !parent.exists()) {
@@ -156,11 +156,11 @@ class ServerThread extends Thread {
       System.out.println(newPass.equals(pass));
       if (!newPass.equals(pass)) {
         System.out.println("Wrong password. Entrou no if");
-        outStream.writeObject(LoginMessage.WrongPassword);
+        outStream.writeUTF("WRONG-PWD");
         outStream.flush();
       } else if (newPass.equals(pass)) {
         System.out.println("Password correct. Entrou no else");
-        outStream.writeObject(LoginMessage.OKUser);
+        outStream.writeUTF("OK-USER");
         outStream.flush();
         break;
       }

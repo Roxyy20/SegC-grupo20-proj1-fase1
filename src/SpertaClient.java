@@ -77,24 +77,18 @@ public class SpertaClient {
       outStream.writeUTF(args[2]);
       outStream.flush();
 
-      LoginMessage msg;
-      try {
-        msg = (LoginMessage) inStream.readObject();
-      } catch (ClassNotFoundException e) {
-        e.printStackTrace();
-        return;
-      }
+      String msg = inStream.readUTF();
       switch (msg) {
-        case WrongPassword:
+        case "WRONG-PWD":
           System.out.println("Wrong password");
           tryNewPassword();
           break;
-        case OKNewUser:
+        case "OK-NEW-USER":
           System.out.println("Ok. You are a new user");
           printhelp();
           readCommands();
           break;
-        case OKUser:
+        case "OK-USER":
           System.out.println("OK, Welcome back");
           printhelp();
           readCommands();
@@ -245,14 +239,8 @@ public class SpertaClient {
       String newPassword = STDIN.nextLine();
       outStream.writeUTF(newPassword);
       outStream.flush();
-      LoginMessage msg;
-      try {
-        msg = (LoginMessage) inStream.readObject();
-      } catch (ClassNotFoundException e) {
-        e.printStackTrace();
-        return;
-      }
-      if (msg == LoginMessage.WrongPassword) {
+      String msg = inStream.readUTF();
+      if ("WRONG-PWD".equals(msg)) {
         System.out.println("Wrong password.");
       } else {
         break;
