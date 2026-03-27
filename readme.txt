@@ -22,11 +22,12 @@ Projeto 1 - Segurança e Confiabilidade
 - `README.md` — instruções curtas já presentes no repositório.
 
 4) Limitações conhecidas
-- Permitimos que dois usuários iguais estejam logados ao mesmo tempo
+- Permitimos que dois usuários iguais estejam logados ao mesmo tempo.
+- Não é possível correr nas máquinas da FCUL, uma vez que diz que não tem permissões sobre os ficheiros.
 
 5) Ambiente usado no desenvolvimento/testes
 - Java 21.0.7 (OpenJDK).
-- Plataforma: Linux (Ubuntu 22.04) das máquinas de laboratório.
+- Plataforma: Linux (Ubuntu 22.04) rm máquinas pessoais.
 - Sem dependências externas além do JDK padrão.
 
 6) Grupo 20:
