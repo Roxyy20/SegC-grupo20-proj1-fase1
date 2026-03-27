@@ -129,7 +129,7 @@ public class Home {
       return ServerResponse.NOPERM;
     System.out.println("Usuario " + user + " adicionado com permissão " + permission + " à " + name);
 
-    if (permission.equalsIgnoreCase("all")) {
+    if (permission.equals("all")) {
       List<String> perms = new ArrayList<>();
       for (Section s : Section.values()) {
         String code = String.valueOf(s.name().charAt(0));
@@ -201,7 +201,7 @@ public class Home {
       return ServerResponse.NOPERM;
 
     for (String p : userPerms)
-      if (p.equalsIgnoreCase(section) || p.equalsIgnoreCase("all"))
+      if (p.equals(section) || p.equals("all"))
         return ServerResponse.OK;
 
     return ServerResponse.NOPERM;

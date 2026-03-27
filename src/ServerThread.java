@@ -209,7 +209,7 @@ class ServerThread extends Thread {
         String[] parts = line.split(":");
         if (parts.length != 2)
           continue;
-        if (parts[0].equalsIgnoreCase(appName)) {
+        if (parts[0].equals(appName)) {
           try {
             return Long.parseLong(parts[1]);
           } catch (NumberFormatException e) {

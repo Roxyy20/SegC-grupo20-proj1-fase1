@@ -111,7 +111,7 @@ public class CommandHandler {
         String[] parts = line.split(";");
         if (parts.length < 3)
           continue;
-        if (!parts[0].equalsIgnoreCase(homeName))
+        if (!parts[0].equals(homeName))
           continue;
         String device = parts[1];
         ServerResponse perm = home.canAccessDevice(device, currentUser);
@@ -256,7 +256,7 @@ public class CommandHandler {
         if (parts.length < 2) {
           continue;
         }
-        if (parts[0].equalsIgnoreCase(user)) {
+        if (parts[0].equals(user)) {
           return true;
         }
       }
