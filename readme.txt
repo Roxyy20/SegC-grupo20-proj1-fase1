@@ -19,7 +19,6 @@ Projeto 1 - Segurança e Confiabilidade
   - `server/homes.txt` — casas, owners e permissões por secção.
   - `server/devices.txt` — último estado conhecido de cada dispositivo.
   - `server/<home>_<device>.csv` — log cronológico de estados por dispositivo.
-- `README.md` — instruções curtas já presentes no repositório.
 
 4) Limitações conhecidas
 - Permitimos que dois usuários iguais estejam logados ao mesmo tempo.
