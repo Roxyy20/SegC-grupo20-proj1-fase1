@@ -12,17 +12,29 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+/**
+ * Trata comandos recebidos de um cliente autenticado, garantindo validações de
+ * permissões e persistindo a informação necessária em disco.
+ *
+ * @author Alice Correia 61844, Marta Rufino 61778, Franscisco Lima 61864
+ */
 public class CommandHandler {
 
   private static final String HOMES_FILE = "server/homes.txt";
   private static final Map<String, Home> homes = new LinkedHashMap<>();
   private final String currentUser;
 
+  /**
+   * Associa o handler a um utilizador autenticado.
+   */
   public CommandHandler(String user) {
     currentUser = user;
   }
 
   // Home
+  /**
+   * Envia para o cliente o log CSV de um dispositivo, validando permissões.
+   */
   public void requestDeviceLog(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
     String homeName = inStream.readUTF();
     String device = inStream.readUTF();
@@ -57,6 +69,10 @@ public class CommandHandler {
   }
 
   // Home
+  /**
+   * Envia para o cliente os últimos estados/temporizações dos dispositivos da
+   * casa a que o utilizador tem acesso.
+   */
   public void requestHomeLog(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
     String homeName = inStream.readUTF();
 
@@ -126,6 +142,10 @@ public class CommandHandler {
   }
 
   // Home
+  /**
+   * Define estado ou temporização de um dispositivo, regista no log e atualiza
+   * o ficheiro de últimos estados.
+   */
   public synchronized void setStateOrTimer(ObjectOutputStream outStream, ObjectInputStream inStream)
       throws IOException {
     String homeName = inStream.readUTF();
@@ -163,6 +183,10 @@ public class CommandHandler {
     System.out.printf("ligando dispositivo %s em %s por %d\n", device, home, value);
   }
 
+  /**
+   * Regista um novo dispositivo numa secção, validando que o utilizador é o
+   * proprietário da casa.
+   */
   public synchronized void registerDevice(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
     String homeName = inStream.readUTF();
     String sectionCode = inStream.readUTF();
@@ -182,6 +206,9 @@ public class CommandHandler {
     outStream.flush();
   }
 
+  /**
+   * Concede permissões de acesso a um utilizador para uma casa e secção.
+   */
   public synchronized void addPermission(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
     String user = inStream.readUTF();
     String homeName = inStream.readUTF();
@@ -210,6 +237,9 @@ public class CommandHandler {
     outStream.flush();
   }
 
+  /**
+   * Verifica se um utilizador está registado no ficheiro de utilizadores.
+   */
   private static Boolean userExists(String user) {
     File usersFile = new File("server/users.txt");
     File parent = usersFile.getParentFile();
@@ -236,10 +266,16 @@ public class CommandHandler {
     return false;
   }
 
+  /**
+   * Indica se uma casa existe no cache em memória.
+   */
   public static Boolean findHome(String home) {
     return getHome(home) != null;
   }
 
+  /**
+   * Cria uma nova casa e associa o utilizador atual como owner.
+   */
   public void createHome(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
     String name = inStream.readUTF().trim();
     if (name.isBlank()) {
@@ -267,6 +303,9 @@ public class CommandHandler {
     outStream.flush();
   }
 
+  /**
+   * Devolve o owner associado a uma casa.
+   */
   public static String findHomeOwner(String homeName) {
     Home record = getHome(homeName);
     return record == null ? null : record.owner;
@@ -290,6 +329,9 @@ public class CommandHandler {
     Home.saveHomesToDisk(homes.values(), HOMES_FILE);
   }
 
+  /**
+   * Obtém uma casa do cache, ignorando maiúsculas/minúsculas.
+   */
   private static Home getHome(String name) {
     if (name == null)
       return null;
@@ -331,6 +373,9 @@ public class CommandHandler {
     }
   }
 
+  /**
+   * Atualiza o ficheiro que guarda o último estado conhecido de cada dispositivo.
+   */
   private void updateLastStatesFile(String homeName, String device, int value) {
     File file = new File("server/devices.txt");
     File parent = file.getParentFile();

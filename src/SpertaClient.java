@@ -7,11 +7,25 @@ import java.net.Socket;
 import java.net.URL;
 import java.util.Scanner;
 
+/**
+ * Cliente de linha de comando que autentica no {@link SpertaServer}, envia
+ * comandos e guarda os ficheiros devolvidos pelo servidor.
+ *
+ * @author Alice Correia 61844, Marta Rufino 61778, Franscisco Lima 61864
+ */
 public class SpertaClient {
   // streams used for sending commands to the server
   private static ObjectOutputStream outStream;
   private static ObjectInputStream inStream;
 
+  /**
+   * Ponto de entrada do cliente. Efetua a ligação ao servidor, trata a
+   * atestação de integridade, autentica o utilizador e inicia o ciclo de
+   * leitura de comandos da consola.
+   *
+   * @param args argumentos da linha de comando: {@code <serverAddress>
+   *             <user-id> <pass>}
+   */
   public static void main(String[] args) {
     if (args.length != 3) {
       System.err.println("Wrong argument count. Usage: SpertaClient <serverAddress> <user-id> <pass>");
@@ -96,6 +110,12 @@ public class SpertaClient {
     }
   }
 
+  /**
+   * Obtém o tamanho do ficheiro fonte ou do bytecode do cliente. Este valor é
+   * usado no processo de atestação realizado pelo servidor.
+   *
+   * @return tamanho do executável ou 0 se não for possível determinar
+   */
   private static long getAppSize() {
     File src = new File("src/SpertaClient.java");
     if (src.exists()) {
@@ -115,6 +135,9 @@ public class SpertaClient {
     return 0L;
   }
 
+  /**
+   * Mostra os comandos disponíveis para o utilizador.
+   */
   public static void printhelp() {
     System.out.println("");
     System.out.println("Comandos Disponíveis:");
@@ -130,6 +153,12 @@ public class SpertaClient {
     System.out.println("");
   }
 
+  /**
+   * Ciclo principal de leitura de comandos a partir da consola do utilizador.
+   * Após cada comando, aciona o respetivo método de envio e trata a resposta.
+   *
+   * @throws IOException se ocorrer erro de I/O na comunicação com o servidor
+   */
   public static void readCommands() throws IOException {
     Scanner sc = new Scanner(System.in);
     boolean running = true;
@@ -155,6 +184,15 @@ public class SpertaClient {
     sc.close();
   }
 
+  /**
+   * Valida e envia um comando para o servidor, escrevendo os argumentos
+   * necessários na stream de saída.
+   *
+   * @param parts tokens do comando introduzido pelo utilizador
+   * @return {@code true} se o comando foi enviado, {@code false} em caso de
+   *         erro de validação
+   * @throws IOException se falhar a escrita na stream
+   */
   private static boolean sendCommand(String[] parts) throws IOException {
     String command = parts[0];
     Command cmdEnum = Command.fromString(command);
@@ -195,6 +233,12 @@ public class SpertaClient {
     return true;
   }
 
+  /**
+   * Solicita ao utilizador uma nova password até que corresponda ao valor
+   * esperado pelo servidor.
+   *
+   * @throws IOException se falhar a comunicação com o servidor
+   */
   private static void tryNewPassword() throws IOException {
     try (Scanner sc = new Scanner(System.in)) {
       while (true) {
@@ -220,12 +264,24 @@ public class SpertaClient {
     readCommands();
   }
 
+  /**
+   * Lê e apresenta a resposta textual simples devolvida pelo servidor.
+   *
+   * @throws IOException se falhar a leitura da stream
+   */
   private static void receiveResponse() throws IOException {
     String response = inStream.readUTF();
     // Mostrar apenas a resposta crua (ex.: NOHM)
     System.out.println(response);
   }
 
+  /**
+   * Recebe do servidor a listagem de estados dos dispositivos de uma casa,
+   * gravando-a num ficheiro local e mostrando o conteúdo no terminal.
+   *
+   * @param home nome da casa solicitada
+   * @throws IOException se ocorrer erro de leitura ou escrita de ficheiro
+   */
   private static void receive_home_devices_file(String home) throws IOException {
     String response = inStream.readUTF();
     if (response.equalsIgnoreCase(ServerResponse.OK.name())) {
@@ -277,6 +333,15 @@ public class SpertaClient {
     }
   }
 
+  /**
+   * Recebe do servidor o ficheiro de histórico (CSV) para um dispositivo
+   * específico, guarda-o em {@code client/<home>_<device>_log.csv} e mostra-o
+   * na consola.
+   *
+   * @param home   casa a que pertence o dispositivo
+   * @param device identificador do dispositivo
+   * @throws IOException se falhar a transferência ou gravação do ficheiro
+   */
   private static void receive_device_log_file(String home, String device) throws IOException {
     String response = inStream.readUTF();
     if (response.equals("OK")) {

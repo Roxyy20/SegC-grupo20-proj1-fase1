@@ -10,12 +10,21 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Modelo de dados de uma casa, com respetivo owner, contadores de dispositivos
+ * por secção e permissões por utilizador.
+ *
+ * @author Alice Correia 61844, Marta Rufino 61778, Franscisco Lima 61864
+ */
 public class Home {
   final String name;
   final String owner;
   final Map<String, Integer> creationCounters = new HashMap<String, Integer>();
   final Map<String, List<String>> permissions = new HashMap<String, List<String>>();
 
+  /**
+   * Cria uma nova casa, inicializando o contador de dispositivos por secção.
+   */
   Home(String name, String owner) {
     this.name = name;
     this.owner = owner;
@@ -26,6 +35,9 @@ public class Home {
     }
   }
 
+  /**
+   * Construtor utilizado na leitura a partir de ficheiro persistido.
+   */
   private Home(String name, String owner, String counters, String... permissions) {
     this.name = name;
     this.owner = owner;
@@ -49,6 +61,9 @@ public class Home {
   }
 
   // returns list with lines
+  /**
+   * Devolve o ficheiro de log associado a um dispositivo.
+   */
   public File requestDeviceLog(String device) {
     File deviceLogFile = new File("server/" + name + "_" + device + ".csv");
     File parent = deviceLogFile.getParentFile();
@@ -59,15 +74,24 @@ public class Home {
   }
 
   // returns list of commands
+  /**
+   * Placeholder para entrega de log completo da casa.
+   */
   public List<String> requestHomeLog() {
     System.out.printf("Entregando log file da casa %s\n", name);
     return null;
   }
 
+  /**
+   * Verifica se o utilizador tem acesso ao dispositivo.
+   */
   public ServerResponse canAccessDevice(String device, String user) {
     return findDeviceAndPermission(device, user);
   }
 
+  /**
+   * Valida e aplica alteração de estado/temporização a um dispositivo.
+   */
   public ServerResponse setStateOrTimer(String device, int value, String user) {
     if (value < 0 || value > 600)
       return ServerResponse.NOK;
@@ -79,6 +103,9 @@ public class Home {
     return ServerResponse.OK;
   }
 
+  /**
+   * Regista um novo dispositivo numa secção, apenas permitido ao owner.
+   */
   public ServerResponse registerDevice(String sectionCode, String currentUser) {
     if (!owner.equals(currentUser))
       return ServerResponse.NOPERM;
@@ -94,6 +121,9 @@ public class Home {
     return ServerResponse.OK;
   }
 
+  /**
+   * Atribui permissões de acesso a secções de uma casa a um utilizador.
+   */
   public ServerResponse addPermission(String user, String permission, String currentUser) {
     if (!owner.equals(currentUser))
       return ServerResponse.NOPERM;
@@ -128,6 +158,10 @@ public class Home {
     return ServerResponse.OK;
   }
 
+  /**
+   * Verifica se o utilizador tem acesso global à casa (apenas owner neste
+   * momento).
+   */
   public ServerResponse canAccessHome(String user) {
     if (owner.equals(user))
       return ServerResponse.OK;
@@ -139,6 +173,10 @@ public class Home {
     return ServerResponse.NOPERM;
   }
 
+  /**
+   * Verifica a existência do dispositivo e se o utilizador tem permissão para
+   * o controlar.
+   */
   private ServerResponse findDeviceAndPermission(String device, String user) {
     if (device == null || device.length() < 2)
       return ServerResponse.NOD;
@@ -170,6 +208,9 @@ public class Home {
 
   }
 
+  /**
+   * Converte a string persistida dos contadores para um mapa.
+   */
   private static Map<String, Integer> countersToMap(String countersStr) {
     if (countersStr == null) {
       return new HashMap<>();
@@ -190,6 +231,9 @@ public class Home {
     return counters;
   }
 
+  /**
+   * Converte o mapa de contadores para formato string persistente.
+   */
   private static String countersToString(Map<String, Integer> counters) {
     StringBuilder sb = new StringBuilder();
     boolean first = true;
@@ -208,6 +252,9 @@ public class Home {
     return sb.toString();
   }
 
+  /**
+   * Guarda em disco a coleção de casas fornecida.
+   */
   public synchronized static void saveHomesToDisk(Collection<Home> homes, String filename) {
     File homesFile = new File(filename);
     File parent = homesFile.getParentFile();
@@ -242,6 +289,9 @@ public class Home {
     }
   }
 
+  /**
+   * Lê de disco a lista de casas e reconstrói os objetos em memória.
+   */
   public synchronized static Map<String, Home> loadHomesFromDisk(String filename) {
     File homesFile = new File(filename);
     Map<String, Home> homes = new HashMap<>();

@@ -10,15 +10,30 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
+/**
+ * Thread responsável por tratar uma ligação de cliente: atestação,
+ * autenticação e encaminhamento de comandos para {@link CommandHandler}.
+ *
+ * @author Alice Correia 61844, Marta Rufino 61778, Franscisco Lima 61864
+ */
 class ServerThread extends Thread {
   private Socket socket = null;
   private static final String APP_FILE = "server/apps.txt";
 
+  /**
+   * Cria a thread associada a um socket já aceite.
+   *
+   * @param inSoc socket da ligação do cliente
+   */
   ServerThread(Socket inSoc) {
     socket = inSoc;
     System.out.println("Thread started for new client");
   }
 
+  /**
+   * Loop principal da thread: realiza atestação, autenticação e despacha
+   * comandos recebidos do cliente até este encerrar a ligação.
+   */
   @Override
   public void run() {
     try (Socket clientSocket = socket;
@@ -129,6 +144,10 @@ class ServerThread extends Thread {
     }
   }
 
+  /**
+   * Lê passwords adicionais enviadas pelo cliente até que coincida com a
+   * registada.
+   */
   private void readNewPassword(ObjectOutputStream outStream, ObjectInputStream inStream, String pass)
       throws IOException {
     while (true) {
@@ -148,6 +167,10 @@ class ServerThread extends Thread {
     }
   }
 
+  /**
+   * Realiza a atestação de integridade verificando o tamanho esperado do
+   * binário/bytecode do cliente.
+   */
   private boolean handleAttestation(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
     String appName = inStream.readUTF();
     long clientSize = inStream.readLong();
@@ -162,6 +185,9 @@ class ServerThread extends Thread {
     return true;
   }
 
+  /**
+   * Obtém o tamanho esperado de uma aplicação registada em {@code apps.txt}.
+   */
   private long readExpectedSize(String appName) {
     File file = new File(APP_FILE);
     if (!file.exists()) {
@@ -189,6 +215,10 @@ class ServerThread extends Thread {
     return -1;
   }
 
+  /**
+   * Garante a existência do ficheiro {@code apps.txt} e migra dados legacy
+   * quando necessário.
+   */
   private void ensureAppFile() {
     File file = new File(APP_FILE);
     File parent = file.getParentFile();

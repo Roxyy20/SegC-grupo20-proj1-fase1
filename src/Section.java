@@ -1,3 +1,8 @@
+/**
+ * Enumeração das secções possíveis numa casa inteligente.
+ *
+ * @author Alice Correia 61844, Marta Rufino 61778, Franscisco Lima 61864
+ */
 public enum Section {
   MULTIMEDIA,
   LUZES,
@@ -6,6 +11,12 @@ public enum Section {
   STORES,
   ELECTROS;
 
+  /**
+   * Converte o primeiro caracter de um código textual na secção correspondente.
+   *
+   * @param code texto introduzido pelo utilizador (ex.: "m" para MULTIMEDIA)
+   * @return secção correspondente ou {@code null} se não existir
+   */
   public static Section parseSection(String code) {
     if (code == null || code.isBlank()) {
       return null;
