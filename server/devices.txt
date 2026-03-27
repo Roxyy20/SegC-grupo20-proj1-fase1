@@ -1,7 +1,0 @@
-casaRoxy;L1;1
-casaMito;g1;200
-casaMelody;L1;1;2026-03-27 11:13:46;melody
-casateste1;P1;1;2026-03-27 10:50:56;mito
-casateste1;M1;1;2026-03-27 10:52:36;roxy
-casaMelody;p1;1;2026-03-27 11:17:37;melody
-casaMelody;M1;1;2026-03-27 11:17:20;bowser

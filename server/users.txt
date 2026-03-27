@@ -1,7 +1,0 @@
-mito:123
-roxy:1234
-melody:123
-bowser:123
-meto:123
-user:123
-melogy:123
