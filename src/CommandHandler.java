@@ -118,7 +118,7 @@ public class CommandHandler {
         if (perm != ServerResponse.OK)
           continue;
         if (sb.length() > 0)
-          sb.append("|");
+          sb.append(System.lineSeparator());
         // keep full line so client sees home;device;value;res;timestamp
         sb.append(line);
       }
@@ -175,10 +175,11 @@ public class CommandHandler {
         String data = new SimpleDateFormat("yyyy-MM-dd").format(currentUserData);
         String time = new SimpleDateFormat("HH:mm:ss").format(currentUserData);
         writer.write(String.format("%s,%s,%s,%d", data, time, currentUser, value));
+        writer.write(System.lineSeparator());
       } catch (IOException e) {
         e.printStackTrace();
       }
-      updateLastStatesFile(homeName, device, value);
+      updateLastStatesFile(homeName, device, value, currentUser);
     }
     System.out.printf("ligando dispositivo %s em %s por %d\n", device, home, value);
   }
@@ -376,7 +377,7 @@ public class CommandHandler {
   /**
    * Atualiza o ficheiro que guarda o último estado conhecido de cada dispositivo.
    */
-  private void updateLastStatesFile(String homeName, String device, int value) {
+  private void updateLastStatesFile(String homeName, String device, int value, String user) {
     File file = new File("server/devices.txt");
     File parent = file.getParentFile();
     if (parent != null && !parent.exists()) {
@@ -400,7 +401,8 @@ public class CommandHandler {
     }
 
     String key = homeName.toLowerCase() + ";" + device.toLowerCase();
-    String newLine = String.format("%s;%s;%d", homeName, device, value);
+    String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
+    String newLine = String.format("%s;%s;%d;%s;%s", homeName, device, value, timestamp, user);
     latest.put(key, newLine);
 
     try (FileWriter writer = new FileWriter(file, false)) {
