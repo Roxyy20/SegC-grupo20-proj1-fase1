@@ -27,8 +27,7 @@ Projeto 1 - Segurança e Confiabilidade
 
 5) Ambiente usado no desenvolvimento/testes
 - Java 21.0.7 (OpenJDK).
-- Plataforma: Linux (Ubuntu 22.04) rm máquinas pessoais.
-- Sem dependências externas além do JDK padrão.
+- Plataforma: Linux (Ubuntu 22.04) nas máquinas pessoais.
 
 6) Grupo 20:
 - Alice Correia fc61844
