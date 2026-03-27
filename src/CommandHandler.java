@@ -285,7 +285,7 @@ public class CommandHandler {
     }
 
     loadHomesFromDisk();
-    String key = name.toLowerCase();
+    String key = name;
     if (homes.containsKey(key)) {
       System.out.println("Home '" + name + "' already exists.");
       outStream.writeUTF(ServerResponse.NOK.name());
@@ -335,7 +335,7 @@ public class CommandHandler {
   private static Home getHome(String name) {
     if (name == null)
       return null;
-    return homes.get(name.toLowerCase());
+    return homes.get(name);
   }
 
   /**
@@ -392,14 +392,14 @@ public class CommandHandler {
           String[] parts = line.split(";");
           if (parts.length < 2)
             continue;
-          latest.put(parts[0].toLowerCase() + ";" + parts[1].toLowerCase(), line);
+          latest.put(parts[0] + ";" + parts[1], line);
         }
       } catch (IOException e) {
         e.printStackTrace();
       }
     }
 
-    String key = homeName.toLowerCase() + ";" + device.toLowerCase();
+    String key = homeName + ";" + device;
     String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
     String newLine = String.format("%s;%s;%d;%s;%s", homeName, device, value, timestamp, user);
     latest.put(key, newLine);

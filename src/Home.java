@@ -313,7 +313,7 @@ public class Home {
         } else {
           record = new Home(homeName, parts[1]);
         }
-        homes.put(homeName.toLowerCase(), record);
+        homes.put(homeName, record);
       }
     } catch (IOException e) {
       e.printStackTrace();
