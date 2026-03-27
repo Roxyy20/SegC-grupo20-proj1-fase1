@@ -167,10 +167,11 @@ public class Home {
       return ServerResponse.OK;
 
     List<String> userPerms = permissions.get(user);
+    System.out.println("Permissões do utilizador " + user + ": " + userPerms);
     if (userPerms == null)
       return ServerResponse.NOPERM;
 
-    return ServerResponse.NOPERM;
+    return ServerResponse.OK;
   }
 
   /**

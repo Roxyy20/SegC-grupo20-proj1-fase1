@@ -1,3 +1,5 @@
 casaRoxy;L1;1
 casaMito;g1;200
 casaMelody;l1;1
+casateste1;P1;1;2026-03-27 10:50:56;mito
+casateste1;M1;1;2026-03-27 10:52:36;roxy

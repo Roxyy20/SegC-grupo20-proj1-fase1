@@ -85,7 +85,7 @@ public class CommandHandler {
     Home home = getHome(homeName);
 
     ServerResponse housePerm = home.canAccessHome(currentUser);
-    if (!ServerResponse.OK.equals(housePerm)) {
+    if (ServerResponse.NOPERM.equals(housePerm)) {
       outStream.writeUTF(housePerm.name());
       outStream.flush();
       return;
