@@ -1,5 +1,7 @@
 Projeto 1 - Segurança e Confiabilidade
 
+0.5)Instalação
+- É necessario executar o comando `chmod -R 777 SegC-grupoo20proj1-fase1` para dar permição de execução aos ficheiros do projeto 
 1) Compilação
 - Requisitos: JDK 21.0.7 (OpenJDK), bash, `javac`, `jar`.
 - Comando: `./build.sh`

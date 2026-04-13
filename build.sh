@@ -1,6 +1,5 @@
 if [ ! -d build ]
 then
-  echo "build does not exist"
   mkdir build
 fi
 javac -d build src/*.java
