@@ -5,6 +5,9 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Scanner;
 
 /**
@@ -85,6 +88,8 @@ public class SpertaClient {
           break;
         case OKNewUser:
           System.out.println("Ok. You are a new user");
+          sendCertificate(outStream, args[1]);
+          System.out.println("Certificate sent");
           printhelp();
           readCommands();
           break;
@@ -380,5 +385,14 @@ public class SpertaClient {
           System.out.println("Resposta desconhecida do servidor.");
       }
     }
+  }
+
+  private static void sendCertificate(ObjectOutputStream outStream, String user) throws IOException {
+    Path certPath = Paths.get("userCerts", user + ".cert");
+    byte[] certBytes = Files.readAllBytes(certPath);
+
+    outStream.writeLong(certBytes.length);
+    outStream.write(certBytes);
+    outStream.flush();
   }
 }

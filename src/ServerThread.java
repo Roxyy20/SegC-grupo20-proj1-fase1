@@ -120,6 +120,7 @@ class ServerThread extends Thread {
           e.printStackTrace();
         }
       outStream.flush();
+      receiveAndStoreCertificate(user, outStream, inStream);
       }
 
       CommandHandler commandHandler = new CommandHandler(user);
@@ -265,4 +266,26 @@ class ServerThread extends Thread {
       e.printStackTrace();
     }
   }
+
+  private void receiveAndStoreCertificate(String user, ObjectOutputStream outStream, ObjectInputStream inStream)
+    throws IOException {
+
+    long certSize = inStream.readLong();
+    if (certSize <= 0) {
+        throw new IOException("Invalid certificate size");
+    }
+
+    byte[] certBytes = inStream.readNBytes((int) certSize);
+    if (certBytes.length != certSize) {
+        throw new IOException("Incomplete certificate received");
+    }
+
+    File certDir = new File("server/certs");
+    if (!certDir.exists()) {
+        certDir.mkdirs();
+    }
+
+    File certFile = new File(certDir, user + ".cert");
+    Files.write(certFile.toPath(), certBytes);
+}
 }
