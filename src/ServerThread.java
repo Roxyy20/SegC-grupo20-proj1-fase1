@@ -70,41 +70,57 @@ class ServerThread extends Thread {
       while ((line = buffReader.readLine()) != null) {
         String[] values = line.split(":");
         String username = values[0];
-        String password = values[1];
+        String storedHash = values[1];
+        String storedSalt = values[2];
         if (username.equals(user)) {
           found = true;
-          if (!password.equals(pass)) {
+
+          byte[] saltBytes = SecurityUtils.fromBase64(storedSalt);
+          String computedHash = SecurityUtils.hashPasswordWithSalt(pass, saltBytes);
+
+          if(storedHash.equals(computedHash)){
+            authenticated = true;
+          }
+          else{
             outStream.writeUTF(LoginMessage.WrongPassword.name());
             outStream.flush();
-            buffReader.close();
-            readNewPassword(outStream, inStream, password);
-            authenticated = true; // nova password válida já confirmada
-          } else {
-            authenticated = true; // password original correta
+            readNewPassword(outStream, inStream, storedHash, storedSalt);
+            authenticated = true;
           }
           break;
         }
       }
       buffReader.close();
       if (found) {
+        System.out.println("Entrou no if found");
         if (!authenticated) {
           // não deve acontecer, mas evitar enviar estado errado
           outStream.writeUTF(LoginMessage.WrongPassword.name());
         } else {
+        System.out.println("Entrou no if authenticated");
         outStream.writeUTF(LoginMessage.OKUser.name());
+        outStream.flush();
+        System.out.println("Enviou OKUser");
         }
       } else {
         outStream.writeUTF(LoginMessage.OKNewUser.name());
+
+        byte[] salt = SecurityUtils.generateSalt();
+        String hashBase64 = SecurityUtils.hashPasswordWithSalt(pass, salt);
+        String saltBase64 = SecurityUtils.toBase64(salt);
+
         File usersFile = new File("server/users.txt");
         File parent = usersFile.getParentFile();
         if (parent != null && !parent.exists()) {
           parent.mkdirs();
         }
-        FileWriter fileWriter = new FileWriter(usersFile, true);
-        fileWriter.write(user + ":" + pass + "\n");
-        fileWriter.close();
-      }
+         try (FileWriter fileWriter = new FileWriter(usersFile, true)) {
+          fileWriter.write(user + ":" + hashBase64 + ":" + saltBase64 + "\n");
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
       outStream.flush();
+      }
 
       CommandHandler commandHandler = new CommandHandler(user);
 
@@ -148,7 +164,7 @@ class ServerThread extends Thread {
             break;
         }
       }
-    } catch (IOException e) {
+    } catch (Exception e) {
       e.printStackTrace();
     }
   }
@@ -157,23 +173,21 @@ class ServerThread extends Thread {
    * Lê passwords adicionais enviadas pelo cliente até que coincida com a
    * registada.
    */
-  private void readNewPassword(ObjectOutputStream outStream, ObjectInputStream inStream, String pass)
-      throws IOException {
+  private void readNewPassword(ObjectOutputStream outStream, ObjectInputStream inStream, String storedHash, String storedSalt) throws Exception {
     while (true) {
-      String newPass = inStream.readUTF();
-      System.out.println("Received new password: " + newPass);
-      System.out.println(newPass.equals(pass));
-      if (!newPass.equals(pass)) {
-        System.out.println("Wrong password.");
-        outStream.writeUTF(LoginMessage.WrongPassword.name());
-        outStream.flush();
-      } else {
-        System.out.println("Password correct.");
-        // sinaliza sucesso sem enviar segunda resposta; quem chamou envia OKUser
-        break;
-      }
+        String newPass = inStream.readUTF();
+
+        byte[] saltBytes = SecurityUtils.fromBase64(storedSalt);
+        String computedHash = SecurityUtils.hashPasswordWithSalt(newPass, saltBytes);
+
+        if (!computedHash.equals(storedHash)) {
+            outStream.writeUTF(LoginMessage.WrongPassword.name());
+            outStream.flush();
+        } else {
+            break;
+        }
     }
-  }
+}
 
   /**
    * Realiza a atestação de integridade verificando o tamanho esperado do
