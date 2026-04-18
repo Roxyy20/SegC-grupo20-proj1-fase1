@@ -17,19 +17,21 @@ public class SecurityUtils {
     // Calcula o hash SHA-256 de um array de bytes.
     public static byte[] sha256(byte[] data) throws Exception {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
-        return digest.digest(data);
+        return digest.digest(data); // Retorna o hash calculado
     }
 
     // Combina a senha com o salt, calcula o hash SHA-256 do resultado e retorna o hash codificado em Base64.
     public static String hashPasswordWithSalt(String password, byte[] salt) throws Exception {
-        byte[] passBytes = password.getBytes(StandardCharsets.UTF_8);
-        byte[] combined = new byte[passBytes.length + salt.length];
+        byte[] passBytes = password.getBytes(StandardCharsets.UTF_8); // Converte a senha para bytes usando UTF-8
+        byte[] combined = new byte[passBytes.length + salt.length]; // Cria um array para armazenar a combinação da senha e do salt
 
         System.arraycopy(passBytes, 0, combined, 0, passBytes.length);
         System.arraycopy(salt, 0, combined, passBytes.length, salt.length);
 
-        byte[] hash = sha256(combined);
-        return Base64.getEncoder().encodeToString(hash);
+        byte[] hash = sha256(combined); // Calcula o hash SHA-256 da combinação da senha e do salt
+
+        //a Base64 é usada para codificar o hash em uma string legível, facilitando o armazenamento e a comparação posterior.
+        return Base64.getEncoder().encodeToString(hash); 
     }
 
     // Codifica um array de bytes em uma string Base64.
