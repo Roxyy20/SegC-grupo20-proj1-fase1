@@ -84,6 +84,7 @@ public class SpertaServer {
       SSLServerSocketFactory factory = buildTlsFactory(keystorePath, passwordKeystore);
       try (SSLServerSocket sSoc = (SSLServerSocket) factory.createServerSocket(port)) {
         sSoc.setNeedClientAuth(false); // autenticação unilateral do servidor
+        FileIntegraty.verifyDirectoryIntegrityOrExit("server");
         System.out.println("Server Started");
         while (true) {
           try {

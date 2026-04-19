@@ -1,7 +1,9 @@
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.MessageDigest;
 import java.util.Base64;
+import java.util.stream.Stream;
 
 public class FileIntegraty {
   // Calcula e guarda o hash SHA-256 do ficheiro.
@@ -40,13 +42,19 @@ public class FileIntegraty {
     if (parent != null && !Files.exists(parent)) {
       Files.createDirectories(parent);
     }
+    boolean createdNow = false;
     if (!Files.exists(path)) {
       Files.createFile(path);
+      createdNow = true;
     }
 
     Path hashPath = Path.of(filePath + ".hash");
     if (!Files.exists(hashPath)) {
-      updateFileHash(filePath);
+      if (createdNow) {
+        updateFileHash(filePath);
+      } else {
+        throw new IllegalStateException("Missing .hash for existing file: " + filePath);
+      }
     }
   }
 
@@ -87,5 +95,22 @@ public class FileIntegraty {
   public static void failIntegrityAndExit() {
     System.err.println("NOK-INTEGRITY");
     System.exit(1);
+  }
+
+  // Verifica integridade de todos os ficheiros (não .hash) dentro de um diretório.
+  public static void verifyDirectoryIntegrityOrExit(String directoryPath) {
+    Path dir = Path.of(directoryPath);
+    if (!Files.exists(dir)) {
+      return;
+    }
+
+    try (Stream<Path> stream = Files.walk(dir)) {
+      stream
+          .filter(Files::isRegularFile)
+          .filter(path -> !path.toString().endsWith(".hash"))
+          .forEach(path -> verifyIntegrityOrExit(path.toString()));
+    } catch (IOException e) {
+      failIntegrityAndExit();
+    }
   }
 }
