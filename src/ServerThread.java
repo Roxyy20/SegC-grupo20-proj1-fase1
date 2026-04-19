@@ -21,6 +21,7 @@ class ServerThread extends Thread {
   private Socket socket = null;
   private String passwordCifra;
   private static final String APP_FILE = "server/apps.txt";
+  private static final String USERS_FILE = "server/users.txt";
   private static final String REFERENCE_APP_ID = "SpertaClient";
   private static final String DEFAULT_REFERENCE_APP_PATH = "build/SpertaClient.jar";
 
@@ -47,6 +48,8 @@ class ServerThread extends Thread {
       outStream.flush();
 
       ensureAppFile();
+      FileIntegraty.ensureFileAndHashOrExit(USERS_FILE);
+      FileIntegraty.verifyIntegrityOrExit(USERS_FILE);
       if (!handleAttestation(outStream, inStream)) {
         return;
       }
@@ -60,7 +63,7 @@ class ServerThread extends Thread {
         return;
       }
 
-      Path path = Paths.get("server/users.txt");
+      Path path = Paths.get(USERS_FILE);
 
       Files.createDirectories(path.getParent());
 
@@ -114,7 +117,7 @@ class ServerThread extends Thread {
         String hashBase64 = SecurityUtils.hashPasswordWithSalt(pass, salt);
         String saltBase64 = SecurityUtils.toBase64(salt);
 
-        File usersFile = new File("server/users.txt");
+        File usersFile = new File(USERS_FILE);
         File parent = usersFile.getParentFile();
         if (parent != null && !parent.exists()) {
           parent.mkdirs();
@@ -124,6 +127,7 @@ class ServerThread extends Thread {
         } catch (IOException e) {
           e.printStackTrace();
         }
+      FileIntegraty.updateHashOrExit(USERS_FILE);
       outStream.flush();
       receiveAndStoreCertificate(user, outStream, inStream);
       }
@@ -200,6 +204,7 @@ class ServerThread extends Thread {
    * cliente envia SHA256(nonce || SpertaClient.jar).
    */
   private boolean handleAttestation(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
+    FileIntegraty.verifyIntegrityOrExit(APP_FILE);
     long nonce = SecurityUtils.generateNonce();
     outStream.writeLong(nonce);
     outStream.flush();
@@ -294,14 +299,8 @@ class ServerThread extends Thread {
       }
     }
 
-    if (!file.exists()) {
-      try (FileWriter writer = new FileWriter(file, false)) {
-        writer.write(REFERENCE_APP_ID + ":" + DEFAULT_REFERENCE_APP_PATH + System.lineSeparator());
-      } catch (IOException e) {
-        e.printStackTrace();
-      }
-      return;
-    }
+    FileIntegraty.ensureFileAndHashOrExit(APP_FILE);
+    FileIntegraty.verifyIntegrityOrExit(APP_FILE);
 
     // Migração simples de formato legacy (SpertaClient:<size>) para caminho de jar.
     try {
@@ -310,9 +309,10 @@ class ServerThread extends Thread {
         try (FileWriter writer = new FileWriter(file, false)) {
           writer.write(REFERENCE_APP_ID + ":" + DEFAULT_REFERENCE_APP_PATH + System.lineSeparator());
         }
+        FileIntegraty.updateHashOrExit(APP_FILE);
       }
     } catch (Exception e) {
-      e.printStackTrace();
+      FileIntegraty.failIntegrityAndExit();
     }
   }
 
@@ -336,5 +336,6 @@ class ServerThread extends Thread {
 
     File certFile = new File(certDir, user + ".cert");
     Files.write(certFile.toPath(), certBytes);
-}
+    FileIntegraty.updateHashOrExit(certFile.getPath());
+  }
 }

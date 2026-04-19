@@ -12,6 +12,7 @@ import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+
 /**
  * Trata comandos recebidos de um cliente autenticado, garantindo validações de
  * permissões e persistindo a informação necessária em disco.
@@ -21,6 +22,8 @@ import java.util.Map;
 public class CommandHandler {
 
   private static final String HOMES_FILE = "server/homes.txt";
+  private static final String USERS_FILE = "server/users.txt";
+  private static final String DEVICES_FILE = "server/devices.txt";
   private static final Map<String, Home> homes = new LinkedHashMap<>();
   private final String currentUser;
 
@@ -61,6 +64,7 @@ public class CommandHandler {
       outStream.flush();
       return;
     }
+    FileIntegraty.verifyIntegrityOrExit(deviceLogFile.getPath());
     outStream.writeUTF(ServerResponse.OK.name());
     byte[] data = java.nio.file.Files.readAllBytes(deviceLogFile.toPath());
     outStream.writeLong(data.length);
@@ -91,16 +95,13 @@ public class CommandHandler {
       return;
     }
 
-    File devicesFile = new File("server/devices.txt");
+    File devicesFile = new File(DEVICES_FILE);
     File parent = devicesFile.getParentFile();
     if (parent != null && !parent.exists()) {
       parent.mkdirs();
     }
-    if (!devicesFile.exists()) {
-      outStream.writeUTF(ServerResponse.NODATA.name());
-      outStream.flush();
-      return;
-    }
+    FileIntegraty.ensureFileAndHashOrExit(DEVICES_FILE);
+    FileIntegraty.verifyIntegrityOrExit(DEVICES_FILE);
 
     StringBuilder sb = new StringBuilder();
     try (BufferedReader reader = new BufferedReader(new FileReader(devicesFile))) {
@@ -170,6 +171,8 @@ public class CommandHandler {
       if (parent != null && !parent.exists()) {
         parent.mkdirs();
       }
+      FileIntegraty.ensureFileAndHashOrExit(deviceLog.getPath());
+      FileIntegraty.verifyIntegrityOrExit(deviceLog.getPath());
       try (FileWriter writer = new FileWriter(deviceLog, true)) {
         Date currentUserData = new Date();
         String data = new SimpleDateFormat("yyyy-MM-dd").format(currentUserData);
@@ -179,6 +182,7 @@ public class CommandHandler {
       } catch (IOException e) {
         e.printStackTrace();
       }
+      FileIntegraty.updateHashOrExit(deviceLog.getPath());
       updateLastStatesFile(homeName, device, value, currentUser);
     }
   }
@@ -241,14 +245,13 @@ public class CommandHandler {
    * Verifica se um utilizador está registado no ficheiro de utilizadores.
    */
   private static Boolean userExists(String user) {
-    File usersFile = new File("server/users.txt");
+    File usersFile = new File(USERS_FILE);
     File parent = usersFile.getParentFile();
     if (parent != null && !parent.exists()) {
       parent.mkdirs();
     }
-    if (!usersFile.exists()) {
-      return false;
-    }
+    FileIntegraty.ensureFileAndHashOrExit(USERS_FILE);
+    FileIntegraty.verifyIntegrityOrExit(USERS_FILE);
     try (BufferedReader reader = new BufferedReader(new FileReader(usersFile))) {
       String line;
       while ((line = reader.readLine()) != null) {
@@ -317,6 +320,8 @@ public class CommandHandler {
    */
   private static void loadHomesFromDisk() {
     ensureHomesFile();
+    FileIntegraty.ensureFileAndHashOrExit(HOMES_FILE);
+    FileIntegraty.verifyIntegrityOrExit(HOMES_FILE);
     homes.clear();
     homes.putAll(Home.loadHomesFromDisk(HOMES_FILE));
   }
@@ -327,7 +332,9 @@ public class CommandHandler {
   private static void saveHomesToDisk() {
     ensureHomesFile();
     Home.saveHomesToDisk(homes.values(), HOMES_FILE);
+    FileIntegraty.updateHashOrExit(HOMES_FILE);
   }
+
 
   /**
    * Obtém uma casa do cache, ignorando maiúsculas/minúsculas.
@@ -377,11 +384,14 @@ public class CommandHandler {
    * Atualiza o ficheiro que guarda o último estado conhecido de cada dispositivo.
    */
   private void updateLastStatesFile(String homeName, String device, int value, String user) {
-    File file = new File("server/devices.txt");
+    File file = new File(DEVICES_FILE);
     File parent = file.getParentFile();
     if (parent != null && !parent.exists()) {
       parent.mkdirs();
     }
+    FileIntegraty.ensureFileAndHashOrExit(DEVICES_FILE);
+    FileIntegraty.verifyIntegrityOrExit(DEVICES_FILE);
+
     Map<String, String> latest = new LinkedHashMap<>();
     if (file.exists()) {
       try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
@@ -412,6 +422,7 @@ public class CommandHandler {
     } catch (IOException e) {
       e.printStackTrace();
     }
+    FileIntegraty.updateHashOrExit(DEVICES_FILE);
   }
 
 }
