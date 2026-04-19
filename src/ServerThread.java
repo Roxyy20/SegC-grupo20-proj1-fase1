@@ -211,21 +211,21 @@ class ServerThread extends Thread {
 
     int hashSize = inStream.readInt();
     if (hashSize != 32) {
-      outStream.writeUTF("NOK-ATTEST");
+      outStream.writeUTF("NOKATTEST");
       outStream.flush();
       return false;
     }
 
     byte[] clientHash = inStream.readNBytes(hashSize);
     if (clientHash.length != hashSize) {
-      outStream.writeUTF("NOK-ATTEST");
+      outStream.writeUTF("NOKATTEST");
       outStream.flush();
       return false;
     }
 
     Path referenceAppPath = readReferenceAppPath(REFERENCE_APP_ID);
     if (referenceAppPath == null || !Files.exists(referenceAppPath)) {
-      outStream.writeUTF("NOK-ATTEST");
+      outStream.writeUTF("NOKATTEST");
       outStream.flush();
       return false;
     }
@@ -233,17 +233,17 @@ class ServerThread extends Thread {
     try {
       byte[] expectedHash = SecurityUtils.sha256WithNonceAndFile(nonce, referenceAppPath);
       if (!MessageDigest.isEqual(clientHash, expectedHash)) {
-        outStream.writeUTF("NOK-ATTEST");
+        outStream.writeUTF("NOKATTEST");
         outStream.flush();
         return false;
       }
     } catch (Exception e) {
-      outStream.writeUTF("NOK-ATTEST");
+      outStream.writeUTF("NOKATTEST");
       outStream.flush();
       return false;
     }
 
-    outStream.writeUTF("OK-ATTEST");
+    outStream.writeUTF("OKATTEST");
     outStream.flush();
     return true;
   }

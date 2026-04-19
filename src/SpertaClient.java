@@ -85,11 +85,11 @@ public class SpertaClient {
           outStream.flush();
 
           String attestResp = inStream.readUTF();
-          if ("NOK-ATTEST".equalsIgnoreCase(attestResp)) {
-              System.out.println("NOK-ATTEST");
+          if ("NOKATTEST".equalsIgnoreCase(attestResp)) {
+              System.out.println("NOKATTEST");
               return;
-          } else if ("OK-ATTEST".equalsIgnoreCase(attestResp)) {
-              System.out.println("OK-ATTEST");
+          } else if ("OKATTEST".equalsIgnoreCase(attestResp)) {
+              System.out.println("OKATTEST");
           } else {
               System.out.println("Unexpected attestation response: " + attestResp);
               return;
