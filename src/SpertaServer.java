@@ -1,68 +1,138 @@
 import java.io.IOException;
-import java.net.ServerSocket;
+import java.io.InputStream;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.security.GeneralSecurityException;
+import java.security.KeyStore;
+import java.security.SecureRandom;
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLServerSocket;
+import javax.net.ssl.SSLServerSocketFactory;
 
 /**
- * Servidor principal que aceita ligações TCP de clientes {@link SpertaClient}
+ * Servidor principal que aceita ligações TLS de clientes {@link SpertaClient}
  * e delega o processamento para {@link ServerThread}.
  *
  * @author Alice Correia 61844, Marta Rufino 61778, Franscisco Lima 61864
  */
 public class SpertaServer {
   /**
-   * Ponto de entrada. Lê opcionalmente a porta da linha de comando e inicia o
-   * servidor.
+   * Ponto de entrada.
    *
-   * @param args opcional {@code <port>}
+   * @param args {@code [<port>] <password-cifra> <keystore> <password-keystore>}
    */
   public static void main(String[] args) {
-    if (args.length > 1) {
-      System.err.println("Wrong argument count. Usage: SpertaServer <port>");
+    if (args.length != 3 && args.length != 4) {
+      System.err.println(
+          "Wrong argument count. Usage: SpertaServer [<port>] <password-cifra> <keystore> <password-keystore>");
       return;
     }
+
     int port = 22345;
-    if (args.length > 0) {
+    String passwordCifra;
+    String keystorePath;
+    String passwordKeystore;
+
+    if (args.length == 4) {
       try {
         port = Integer.parseInt(args[0]);
       } catch (NumberFormatException e) {
-        System.out.format("'%s' id not a valid port format. Using default value of 22345\n", args[0]);
+        System.out.format("'%s' is not a valid port format. Using default value of 22345%n", args[0]);
       }
+      passwordCifra = args[1];
+      keystorePath = args[2];
+      passwordKeystore = args[3];
+    } else {
+      passwordCifra = args[0];
+      keystorePath = args[1];
+      passwordKeystore = args[2];
     }
-    System.out.format("Starting server at port %s\n", port);
-    SpertaServer server = new SpertaServer(port);
+
+    System.out.format("Starting server at port %s%n", port);
+    SpertaServer server = new SpertaServer(port, passwordCifra, keystorePath, passwordKeystore);
     server.start();
   }
 
-  private int port;
+  private final int port;
+  private final String passwordCifra;
+  private final String keystorePath;
+  private final String passwordKeystore;
 
   /**
-   * Cria uma instância parametrizada com a porta de escuta.
+   * Cria uma instância parametrizada com a porta de escuta e configuração TLS.
    *
    * @param port porta TCP
+   * @param passwordCifra senha para cifrar os dados da aplicação
+   * @param keystorePath caminho da keystore do servidor
+   * @param passwordKeystore password da keystore
    */
-  SpertaServer(int port) {
+  SpertaServer(int port, String passwordCifra, String keystorePath, String passwordKeystore) {
     this.port = port;
+    this.passwordCifra = passwordCifra;
+    this.keystorePath = keystorePath;
+    this.passwordKeystore = passwordKeystore;
   }
 
   /**
-   * Arranca o ciclo de aceitação de clientes e cria uma nova thread por
-   * ligação.
+   * Arranca o ciclo de aceitação de clientes e cria uma nova thread por ligação.
    */
   public void start() {
-    try (ServerSocket sSoc = new ServerSocket(port)) {
-      System.out.println("Server Started");
-      while (true) {
-        try {
-          Socket inSoc = sSoc.accept();
-          ServerThread newServerThread = new ServerThread(inSoc);
-          newServerThread.start();
-        } catch (IOException e) {
-          e.printStackTrace();
+    try {
+      SSLServerSocketFactory factory = buildTlsFactory(keystorePath, passwordKeystore);
+      try (SSLServerSocket sSoc = (SSLServerSocket) factory.createServerSocket(port)) {
+        sSoc.setNeedClientAuth(false); // autenticação unilateral do servidor
+        System.out.println("Server Started");
+        while (true) {
+          try {
+            Socket inSoc = sSoc.accept();
+            // O socket já é TLS; a thread só precisa do canal + dados da aplicação.
+            ServerThread newServerThread = new ServerThread(inSoc, passwordCifra);
+            newServerThread.start();
+          } catch (IOException e) {
+            e.printStackTrace();
+          }
         }
       }
-    } catch (IOException e) {
+    } catch (IOException | GeneralSecurityException e) {
       System.err.println(e.getMessage());
       System.exit(-1);
     }
+  }
+
+  private SSLServerSocketFactory buildTlsFactory(String keyStorePath, String keyStorePassword)
+      throws IOException, GeneralSecurityException {
+    KeyStore keyStore = loadKeyStore(keyStorePath, keyStorePassword);
+
+    KeyManagerFactory kmf = KeyManagerFactory.getInstance(KeyManagerFactory.getDefaultAlgorithm());
+    kmf.init(keyStore, keyStorePassword.toCharArray());
+
+    SSLContext context = SSLContext.getInstance("TLS");
+    context.init(kmf.getKeyManagers(), null, new SecureRandom());
+    return context.getServerSocketFactory();
+  }
+
+  private KeyStore loadKeyStore(String keyStorePath, String keyStorePassword)
+      throws IOException, GeneralSecurityException {
+    Path path = Paths.get(keyStorePath);
+    String[] candidateTypes = new String[] {KeyStore.getDefaultType(), "JKS", "PKCS12"};
+    GeneralSecurityException lastSecurityException = null;
+
+    for (String type : candidateTypes) {
+      try (InputStream in = Files.newInputStream(path)) {
+        KeyStore keyStore = KeyStore.getInstance(type);
+        keyStore.load(in, keyStorePassword.toCharArray());
+        return keyStore;
+      } catch (GeneralSecurityException e) {
+        lastSecurityException = e;
+      }
+    }
+
+    if (lastSecurityException != null) {
+      throw lastSecurityException;
+    }
+    throw new GeneralSecurityException("Unable to load keystore.");
   }
 }

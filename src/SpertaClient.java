@@ -3,12 +3,12 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.net.Socket;
-import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.Scanner;
+import javax.net.ssl.SSLSocket;
+import javax.net.ssl.SSLSocketFactory;
 
 /**
  * Cliente de linha de comando que autentica no {@link SpertaServer}, envia
@@ -32,108 +32,122 @@ public class SpertaClient {
    *             <user-id> <pass>}
    */
   public static void main(String[] args) {
-    if (args.length != 3) {
-      System.err.println("Wrong argument count. Usage: SpertaClient <serverAddress> <user-id> <pass>");
-      return;
-    }
-
-    String[] values = args[0].split(":");
-
-    String address = values[0];
-
-    int port = 22345;
-    if (values.length > 1) {
       try {
-        port = Integer.parseInt(values[1]);
-      } catch (NumberFormatException e) {
-        System.out.format("'%s' id not a valid port format. Using default value of 22345\n", values[1]);
+          if (args.length != 7) {
+              System.err.println("Wrong argument count. Usage: SpertaClient <serverAddress> <truststore> <password-truststore> <keystore> <password-keystore> <user-id> <password>");
+              return;
+          }
+          
+          String[] values = args[0].split(":");
+          
+          String address = values[0];
+          
+          int port = 22345;
+          if (values.length > 1) {
+              try {
+                  port = Integer.parseInt(values[1]);
+              } catch (NumberFormatException e) {
+                  System.out.format("'%s' id not a valid port format. Using default value of 22345\n", values[1]);
+              }
+          }
+          String truststore = args[1];
+          String passwordTruststore = args[2];
+          String keystore = args[3];
+          String passwordKeystore = args[4];
+          String userId = args[5];
+          String password = args[6];
+
+          System.setProperty("javax.net.ssl.trustStore", truststore);
+          System.setProperty("javax.net.ssl.trustStorePassword", passwordTruststore);
+          System.setProperty("javax.net.ssl.keyStore", keystore);
+          System.setProperty("javax.net.ssl.keyStorePassword", passwordKeystore);
+          SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
+          SSLSocket clientSocket = (SSLSocket) factory.createSocket(address, port);
+          System.out.println("Connected");
+          // assign to static fields so other methods can use them
+          outStream = new ObjectOutputStream(clientSocket.getOutputStream());
+          outStream.flush();
+          inStream = new ObjectInputStream(clientSocket.getInputStream());
+          
+          // attestation anti-replay: SHA256(nonce || SpertaClient.jar)
+          long nonce = inStream.readLong();
+          byte[] hash;
+          try {
+            Path clientJarPath = resolveClientJarPath();
+            hash = SecurityUtils.sha256WithNonceAndFile(nonce, clientJarPath);
+          } catch (Exception e) {
+            System.err.println("Erro a calcular atestação: " + e.getMessage());
+            return;
+          }
+
+          outStream.writeInt(hash.length);
+          outStream.write(hash);
+          outStream.flush();
+
+          String attestResp = inStream.readUTF();
+          if ("NOK-ATTEST".equalsIgnoreCase(attestResp)) {
+              System.out.println("NOK-ATTEST");
+              return;
+          } else if ("OK-ATTEST".equalsIgnoreCase(attestResp)) {
+              System.out.println("OK-ATTEST");
+          } else {
+              System.out.println("Unexpected attestation response: " + attestResp);
+              return;
+          }
+          
+          // send credentials
+          outStream.writeUTF(userId);
+          outStream.writeUTF(password);
+          outStream.flush();
+          
+          LoginMessage msg = LoginMessage.valueOf(inStream.readUTF());
+          switch (msg) {
+              case WrongPassword:
+                  System.out.println("Wrong password");
+                  tryNewPassword();
+                  break;
+              case OKNewUser:
+                  System.out.println("Ok. You are a new user");
+                  sendCertificate(outStream, userId);
+                  System.out.println("Certificate sent");
+                  printhelp();
+                  readCommands();
+                  break;
+              case OKUser:
+                  System.out.println("OK, Welcome back");
+                  printhelp();
+                  readCommands();
+                  break;
+                  
+              default:
+                  break;
+          }
+          // cleanup streams after command loop returns
+          outStream.close();
+          inStream.close();
+      } catch (IOException e) {
+          System.err.println("Error: " + e.getMessage());
       }
-    }
-
-    try (Socket clientSocket = new Socket(address, port)) {
-      System.out.println("Connected");
-      // assign to static fields so other methods can use them
-      outStream = new ObjectOutputStream(clientSocket.getOutputStream());
-      outStream.flush();
-      inStream = new ObjectInputStream(clientSocket.getInputStream());
-
-      // attestation: send app name and size, wait for response
-      String appName = "SpertaClient";
-      long appSize = getAppSize();
-      outStream.writeUTF(appName);
-      outStream.writeLong(appSize);
-      outStream.flush();
-
-      String attestResp = inStream.readUTF();
-      if ("ATTESTATION FAILED".equalsIgnoreCase(attestResp)) {
-        System.out.println("ATTESTATION FAILED");
-        return;
-      } else if ("ATTESTATION OK".equalsIgnoreCase(attestResp)) {
-        System.out.println("ATTESTATION OK");
-      } else {
-        System.out.println("Unexpected attestation response: " + attestResp);
-        return;
-      }
-
-      // send credentials
-      outStream.writeUTF(args[1]);
-      outStream.writeUTF(args[2]);
-      outStream.flush();
-
-      LoginMessage msg = LoginMessage.valueOf(inStream.readUTF());
-      switch (msg) {
-        case WrongPassword:
-          System.out.println("Wrong password");
-          tryNewPassword();
-          break;
-        case OKNewUser:
-          System.out.println("Ok. You are a new user");
-          sendCertificate(outStream, args[1]);
-          System.out.println("Certificate sent");
-          printhelp();
-          readCommands();
-          break;
-        case OKUser:
-          System.out.println("OK, Welcome back");
-          printhelp();
-          readCommands();
-          break;
-
-        default:
-          break;
-      }
-
-      // cleanup streams after command loop returns
-      outStream.close();
-      inStream.close();
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
   }
 
   /**
-   * Obtém o tamanho do ficheiro fonte ou do bytecode do cliente. Este valor é
-   * usado no processo de atestação realizado pelo servidor.
-   *
-   * @return tamanho do executável ou 0 se não for possível determinar
+   * Resolve o caminho do jar em execução para usar na atestação remota.
    */
-  private static long getAppSize() {
-    File src = new File("src/SpertaClient.java");
-    if (src.exists()) {
-      return src.length();
-    }
+  private static Path resolveClientJarPath() throws IOException {
     try {
-      URL url = SpertaClient.class.getResource("SpertaClient.class");
-      if (url != null && "file".equals(url.getProtocol())) {
-        File f = new File(url.getFile());
-        if (f.exists()) {
-          return f.length();
-        }
+      Path codeSourcePath = Paths.get(SpertaClient.class.getProtectionDomain().getCodeSource().getLocation().toURI());
+      if (Files.isRegularFile(codeSourcePath)) {
+        return codeSourcePath;
       }
     } catch (Exception e) {
-      // ignore and fall through
+      // fallback abaixo
     }
-    return 0L;
+
+    Path fallback = Paths.get("build", "SpertaClient.jar");
+    if (Files.isRegularFile(fallback)) {
+      return fallback;
+    }
+    throw new IOException("Não foi possível localizar SpertaClient.jar para atestação.");
   }
 
   /**

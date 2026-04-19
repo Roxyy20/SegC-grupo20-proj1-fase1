@@ -1,1 +1,1 @@
-SpertaClient:14248
+SpertaClient:build/SpertaClient.jar

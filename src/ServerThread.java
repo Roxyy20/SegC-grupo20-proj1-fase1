@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
+import java.security.MessageDigest;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -18,15 +19,19 @@ import java.nio.file.Paths;
  */
 class ServerThread extends Thread {
   private Socket socket = null;
+  private String passwordCifra;
   private static final String APP_FILE = "server/apps.txt";
+  private static final String REFERENCE_APP_ID = "SpertaClient";
+  private static final String DEFAULT_REFERENCE_APP_PATH = "build/SpertaClient.jar";
 
   /**
    * Cria a thread associada a um socket já aceite.
    *
    * @param inSoc socket da ligação do cliente
    */
-  ServerThread(Socket inSoc) {
+  ServerThread(Socket inSoc, String passwordCifra) {
     socket = inSoc;
+    this.passwordCifra = passwordCifra;
     System.out.println("Thread started for new client");
   }
 
@@ -191,51 +196,81 @@ class ServerThread extends Thread {
 }
 
   /**
-   * Realiza a atestação de integridade verificando o tamanho esperado do
-   * binário/bytecode do cliente.
+   * Realiza atestação anti-replay com nonce:
+   * cliente envia SHA256(nonce || SpertaClient.jar).
    */
   private boolean handleAttestation(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
-    String appName = inStream.readUTF();
-    long clientSize = inStream.readLong();
-    long expectedSize = readExpectedSize(appName);
-    if (expectedSize <= 0 || expectedSize != clientSize) {
-      outStream.writeUTF("ATTESTATION FAILED");
+    long nonce = SecurityUtils.generateNonce();
+    outStream.writeLong(nonce);
+    outStream.flush();
+
+    int hashSize = inStream.readInt();
+    if (hashSize != 32) {
+      outStream.writeUTF("NOK-ATTEST");
       outStream.flush();
       return false;
     }
-    outStream.writeUTF("ATTESTATION OK");
+
+    byte[] clientHash = inStream.readNBytes(hashSize);
+    if (clientHash.length != hashSize) {
+      outStream.writeUTF("NOK-ATTEST");
+      outStream.flush();
+      return false;
+    }
+
+    Path referenceAppPath = readReferenceAppPath(REFERENCE_APP_ID);
+    if (referenceAppPath == null || !Files.exists(referenceAppPath)) {
+      outStream.writeUTF("NOK-ATTEST");
+      outStream.flush();
+      return false;
+    }
+
+    try {
+      byte[] expectedHash = SecurityUtils.sha256WithNonceAndFile(nonce, referenceAppPath);
+      if (!MessageDigest.isEqual(clientHash, expectedHash)) {
+        outStream.writeUTF("NOK-ATTEST");
+        outStream.flush();
+        return false;
+      }
+    } catch (Exception e) {
+      outStream.writeUTF("NOK-ATTEST");
+      outStream.flush();
+      return false;
+    }
+
+    outStream.writeUTF("OK-ATTEST");
     outStream.flush();
     return true;
   }
 
   /**
-   * Obtém o tamanho esperado de uma aplicação registada em {@code apps.txt}.
+   * Obtém o caminho da aplicação de referência registada em {@code apps.txt}.
    */
-  private long readExpectedSize(String appName) {
+  private Path readReferenceAppPath(String appName) {
     File file = new File(APP_FILE);
     if (!file.exists()) {
-      return -1;
+      return null;
     }
     try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
       String line;
       while ((line = reader.readLine()) != null) {
         if (line.isBlank())
           continue;
-        String[] parts = line.split(":");
+        String[] parts = line.split(":", 2);
         if (parts.length != 2)
           continue;
         if (parts[0].equals(appName)) {
-          try {
-            return Long.parseLong(parts[1]);
-          } catch (NumberFormatException e) {
-            return -1;
+          String pathValue = parts[1].trim();
+          if (pathValue.isBlank()) {
+            return null;
           }
+          return Paths.get(pathValue);
         }
       }
     } catch (IOException e) {
       e.printStackTrace();
     }
-    return -1;
+    return null;
   }
 
   /**
@@ -259,10 +294,24 @@ class ServerThread extends Thread {
       }
     }
 
-    long size = new File("src/SpertaClient.java").length();
-    try (FileWriter writer = new FileWriter(file, false)) {
-      writer.write("SpertaClient:" + size + System.lineSeparator());
-    } catch (IOException e) {
+    if (!file.exists()) {
+      try (FileWriter writer = new FileWriter(file, false)) {
+        writer.write(REFERENCE_APP_ID + ":" + DEFAULT_REFERENCE_APP_PATH + System.lineSeparator());
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+      return;
+    }
+
+    // Migração simples de formato legacy (SpertaClient:<size>) para caminho de jar.
+    try {
+      Path appPath = readReferenceAppPath(REFERENCE_APP_ID);
+      if (appPath == null || !Files.exists(appPath)) {
+        try (FileWriter writer = new FileWriter(file, false)) {
+          writer.write(REFERENCE_APP_ID + ":" + DEFAULT_REFERENCE_APP_PATH + System.lineSeparator());
+        }
+      }
+    } catch (Exception e) {
       e.printStackTrace();
     }
   }
