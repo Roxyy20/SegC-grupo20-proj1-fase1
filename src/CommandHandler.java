@@ -318,21 +318,30 @@ public class CommandHandler {
   }
 
   private void storeEncryptedSectionKey(String homeName, String section, String owner, byte[] encryptedKey)
-    throws IOException {
+      throws IOException {
 
     File dir = new File(SECTION_KEYS_DIR);
     if (!dir.exists()) {
       dir.mkdirs();
     }
 
-    File keyFile = new File(dir, "key." + homeName + "." + section + "." + owner);
+    String sectionCode = sectionKeyCode(section);
+    File keyFile = new File(dir, "key." + homeName + "." + sectionCode + "." + owner);
     Files.write(keyFile.toPath(), encryptedKey);
 
     FileIntegraty.updateHashOrExit(keyFile.getPath());
-}
+  }
 
-private void receiveAndStoreSectionKeysForCreate(ObjectInputStream inStream, String homeName, String owner)
-    throws IOException {
+  private String sectionKeyCode(String section) throws IOException {
+    Section parsedSection = Section.parseSection(section);
+    if (parsedSection == null) {
+      throw new IOException("Invalid section identifier");
+    }
+    return String.valueOf(parsedSection.name().charAt(0));
+  }
+
+  private void receiveAndStoreSectionKeysForCreate(ObjectInputStream inStream, String homeName, String owner)
+      throws IOException {
 
   int sectionCount = inStream.readInt();
   if (sectionCount <= 0) {
