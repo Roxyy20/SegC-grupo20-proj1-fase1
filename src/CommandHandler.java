@@ -26,6 +26,7 @@ public class CommandHandler {
   private static final String DEVICES_FILE = "server/devices.txt";
   private static final Map<String, Home> homes = new LinkedHashMap<>();
   private final String currentUser;
+  private static final String SECTION_KEYS_DIR = "server/sectionKeys";
 
   /**
    * Associa o handler a um utilizador autenticado.
@@ -304,7 +305,59 @@ public class CommandHandler {
     System.out.println("Creating home '" + name + "'");
     outStream.writeUTF(ServerResponse.OK.name());
     outStream.flush();
+
+    try {
+      receiveAndStoreSectionKeysForCreate(inStream, name, currentUser);
+      outStream.writeUTF(ServerResponse.OK.name());
+    } catch (IOException e) {
+      outStream.writeUTF(ServerResponse.NOK.name());
+      throw e;
+    }
+
+    outStream.flush();
   }
+
+  private void storeEncryptedSectionKey(String homeName, String section, String owner, byte[] encryptedKey)
+    throws IOException {
+
+    File dir = new File(SECTION_KEYS_DIR);
+    if (!dir.exists()) {
+      dir.mkdirs();
+    }
+
+    File keyFile = new File(dir, "key." + homeName + "." + section + "." + owner);
+    Files.write(keyFile.toPath(), encryptedKey);
+
+    FileIntegraty.updateHashOrExit(keyFile.getPath());
+}
+
+private void receiveAndStoreSectionKeysForCreate(ObjectInputStream inStream, String homeName, String owner)
+    throws IOException {
+
+  int sectionCount = inStream.readInt();
+  if (sectionCount <= 0) {
+    throw new IOException("Invalid number of sections received");
+  }
+
+  for (int i = 0; i < sectionCount; i++) {
+    String section = inStream.readUTF().trim();
+    if (section.isBlank()) {
+      throw new IOException("Invalid section identifier");
+    }
+
+    int keySize = inStream.readInt();
+    if (keySize <= 0) {
+      throw new IOException("Invalid encrypted section key size");
+    }
+
+    byte[] encryptedKey = inStream.readNBytes(keySize);
+    if (encryptedKey.length != keySize) {
+      throw new IOException("Incomplete encrypted section key received");
+    }
+
+    storeEncryptedSectionKey(homeName, section, owner, encryptedKey);
+  }
+}
 
   /**
    * Devolve o owner associado a uma casa.

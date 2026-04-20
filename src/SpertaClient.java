@@ -289,12 +289,12 @@ public class SpertaClient {
 
     outStream.writeInt(Section.values().length);
 
-    for (String section : Section.values().toString().split(",")) { 
+    for (Section section : Section.values()) {
       javax.crypto.SecretKey sectionKey = CryptoUtils.generateAESKey();
       byte[] sectionKeyBytes = CryptoUtils.aesKeyToBytes(sectionKey);
       byte[] encryptedSectionKey = CryptoUtils.encryptRSA(sectionKeyBytes, ownerPublicKey);
 
-      outStream.writeUTF(section);
+      outStream.writeUTF(section.name());
       outStream.writeInt(encryptedSectionKey.length);
       outStream.write(encryptedSectionKey);
     }

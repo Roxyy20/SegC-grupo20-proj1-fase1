@@ -18,7 +18,6 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
 public class CryptoUtils {
-
     private static final String AES_ALGORITHM = "AES";
     private static final String AES_TRANSFORMATION = "AES";
     private static final int AES_KEY_SIZE = 128;
