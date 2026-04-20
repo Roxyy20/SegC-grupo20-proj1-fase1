@@ -6,6 +6,7 @@ import java.io.ObjectOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.PublicKey;
 import java.util.Scanner;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
@@ -22,6 +23,11 @@ public class SpertaClient {
   private static ObjectInputStream inStream;
   // scanner partilhado para evitar fechar System.in
   private static final Scanner STDIN = new Scanner(System.in);
+
+  // dados necessários para crypto / keystore
+  private static String keystore;
+  private static String passwordKeystore;
+  private static String userId;
 
   /**
    * Ponto de entrada do cliente. Efetua a ligação ao servidor, trata a
@@ -52,9 +58,9 @@ public class SpertaClient {
           }
           String truststore = args[1];
           String passwordTruststore = args[2];
-          String keystore = args[3];
-          String passwordKeystore = args[4];
-          String userId = args[5];
+          keystore = args[3];
+          passwordKeystore = args[4];
+          userId = args[5];
           String password = args[6];
 
           System.setProperty("javax.net.ssl.trustStore", truststore);
@@ -187,7 +193,10 @@ public class SpertaClient {
       if (!sent)
         continue; // erro nos argumentos → voltar a pedir comando
 
-      if (mensagem[0].equalsIgnoreCase("RT")) {
+      
+      if(mensagem[0].equalsIgnoreCase("CREATE")) {
+        receiveCreateResponseAndSendSectionKeys(mensagem[1]);
+      } else if (mensagem[0].equalsIgnoreCase("RT")) {
         receive_home_devices_file(mensagem[1]);
       } else if (mensagem[0].equalsIgnoreCase("RH")) {
         receive_device_log_file(mensagem[1], mensagem[2]);
@@ -245,6 +254,55 @@ public class SpertaClient {
     outStream.flush();
     return true;
   }
+
+   /**
+   * Trata a resposta ao CREATE. Se a casa for criada com sucesso,
+   * gera e envia as chaves de secção cifradas para o owner.
+   */
+  private static void receiveCreateResponseAndSendSectionKeys(String home) throws IOException {
+    String response = inStream.readUTF();
+    System.out.println(response);
+
+    if (!response.equalsIgnoreCase("OK")) {
+      return;
+    }
+
+    try {
+      sendSectionKeysForCreate(home);
+      String finalResponse = inStream.readUTF();
+      System.out.println(finalResponse);
+    } catch (Exception e) {
+      throw new IOException("Erro ao gerar/enviar chaves de secção: " + e.getMessage(), e);
+    }
+  }
+
+  /**
+   * Gera uma chave AES por secção, cifra-a com a chave pública do owner
+   * e envia-a ao servidor.
+   */
+  private static void sendSectionKeysForCreate(String home) throws Exception {
+    PublicKey ownerPublicKey = CryptoUtils.getPublicKeyFromKeystore(
+        keystore,
+        passwordKeystore,
+        userId
+    );
+
+    outStream.writeInt(Section.values().length);
+
+    for (String section : Section.values().toString().split(",")) { 
+      javax.crypto.SecretKey sectionKey = CryptoUtils.generateAESKey();
+      byte[] sectionKeyBytes = CryptoUtils.aesKeyToBytes(sectionKey);
+      byte[] encryptedSectionKey = CryptoUtils.encryptRSA(sectionKeyBytes, ownerPublicKey);
+
+      outStream.writeUTF(section);
+      outStream.writeInt(encryptedSectionKey.length);
+      outStream.write(encryptedSectionKey);
+    }
+
+    outStream.flush();
+  }
+
+
 
   /**
    * Solicita ao utilizador uma nova password até que corresponda ao valor
