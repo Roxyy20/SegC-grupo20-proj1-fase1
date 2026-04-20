@@ -7,6 +7,7 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Base64;
 import java.util.Date;
@@ -66,9 +67,24 @@ public class CommandHandler {
       outStream.flush();
       return;
     }
+
+    String section = deviceSectionCode(device);
+    File keyFile = findEncryptedSectionKey(homeName, section, currentUser);
+    if (keyFile == null || !keyFile.exists()) {
+      outStream.writeUTF(ServerResponse.NODATA.name());
+      outStream.flush();
+      return;
+    }
+
     FileIntegraty.verifyIntegrityOrExit(deviceLogFile.getPath());
+    FileIntegraty.verifyIntegrityOrExit(keyFile.getPath());
+    byte[] encryptedSectionKey = Files.readAllBytes(keyFile.toPath());
+    byte[] data = Files.readAllBytes(deviceLogFile.toPath());
+
     outStream.writeUTF(ServerResponse.OK.name());
-    byte[] data = java.nio.file.Files.readAllBytes(deviceLogFile.toPath());
+    outStream.writeUTF(section);
+    outStream.writeInt(encryptedSectionKey.length);
+    outStream.write(encryptedSectionKey);
     outStream.writeLong(data.length);
     outStream.write(data);
     outStream.flush();
@@ -105,7 +121,8 @@ public class CommandHandler {
     FileIntegraty.ensureFileAndHashOrExit(DEVICES_FILE);
     FileIntegraty.verifyIntegrityOrExit(DEVICES_FILE);
 
-    StringBuilder sb = new StringBuilder();
+    Map<String, StringBuilder> dataBySection = new LinkedHashMap<>();
+    boolean hasDataForHome = false;
     try (BufferedReader reader = new BufferedReader(new FileReader(devicesFile))) {
       String line;
       while ((line = reader.readLine()) != null) {
@@ -116,30 +133,51 @@ public class CommandHandler {
           continue;
         if (!parts[0].equals(homeName))
           continue;
+        hasDataForHome = true;
         String device = parts[1];
         ServerResponse perm = home.canAccessDevice(device, currentUser);
         if (perm != ServerResponse.OK)
           continue;
-        if (sb.length() > 0)
-          sb.append(System.lineSeparator());
-        // keep full line so client sees home;device;value;res;timestamp
-        sb.append(line);
+        String section = deviceSectionCode(device);
+        StringBuilder sectionData = dataBySection.computeIfAbsent(section, key -> new StringBuilder());
+        if (sectionData.length() > 0)
+          sectionData.append(System.lineSeparator());
+        sectionData.append(line);
       }
     }
 
-    if (sb.length() == 0) {
-      outStream.writeUTF(ServerResponse.NODATA.name());
+    if (dataBySection.isEmpty()) {
+      if (hasDataForHome) {
+        outStream.writeUTF(ServerResponse.NOPERM.name());
+      } else {
+        outStream.writeUTF(ServerResponse.NODATA.name());
+      }
     } else {
+      for (String section : dataBySection.keySet()) {
+        File keyFile = findEncryptedSectionKey(homeName, section, currentUser);
+        if (keyFile == null || !keyFile.exists()) {
+          outStream.writeUTF(ServerResponse.NODATA.name());
+          outStream.flush();
+          return;
+        }
+      }
+
       outStream.writeUTF(ServerResponse.OK.name());
+      outStream.writeInt(dataBySection.size());
 
-      // converter string para bytes
-      byte[] data = sb.toString().getBytes();
+      for (Map.Entry<String, StringBuilder> entry : dataBySection.entrySet()) {
+        String section = entry.getKey();
+        File keyFile = findEncryptedSectionKey(homeName, section, currentUser);
+        FileIntegraty.verifyIntegrityOrExit(keyFile.getPath());
+        byte[] encryptedSectionKey = Files.readAllBytes(keyFile.toPath());
+        byte[] sectionData = entry.getValue().toString().getBytes(StandardCharsets.UTF_8);
 
-      // enviar tamanho (LONG)
-      outStream.writeLong(data.length);
-
-      // enviar conteúdo
-      outStream.write(data);
+        outStream.writeUTF(section);
+        outStream.writeInt(encryptedSectionKey.length);
+        outStream.write(encryptedSectionKey);
+        outStream.writeLong(sectionData.length);
+        outStream.write(sectionData);
+      }
     }
     outStream.flush();
   }

@@ -9,6 +9,7 @@ import java.nio.file.Paths;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.List;
 import java.util.Scanner;
 import javax.net.ssl.SSLSocket;
@@ -534,41 +535,35 @@ public class SpertaClient {
   private static void receive_home_devices_file(String home) throws IOException {
     String response = inStream.readUTF();
     if (response.equalsIgnoreCase("OK")) {
-      long fileSize = inStream.readLong();
-      System.out.printf("OK, %d (long).%n", fileSize);
+      int sectionCount = inStream.readInt();
+      if (sectionCount <= 0) {
+        throw new IOException("Invalid number of sections received");
+      }
 
-      // 2. Preparar ficheiro
+      StringBuilder plaintext = new StringBuilder();
+      for (int i = 0; i < sectionCount; i++) {
+        String section = inStream.readUTF();
+        javax.crypto.SecretKey sectionKey = readSectionKey();
+        byte[] encryptedData = readByteBlock();
+        String sectionContent = CryptoUtils.bytesToString(encryptedData);
+        String decryptedSectionContent = decryptRtSectionContent(sectionContent, sectionKey);
+        if (plaintext.length() > 0 && !decryptedSectionContent.isBlank()) {
+          plaintext.append(System.lineSeparator());
+        }
+        plaintext.append(decryptedSectionContent);
+        System.out.printf("OK, secção %s recebida.%n", section);
+      }
+
       File outputFile = new File("client/devices_" + home + "_recebido.txt");
       File parent = outputFile.getParentFile();
       if (parent != null && !parent.exists()) {
         parent.mkdirs();
       }
-
-      FileOutputStream fos = new FileOutputStream(outputFile);
-      java.io.ByteArrayOutputStream memoryCopy = new java.io.ByteArrayOutputStream((int) fileSize);
-
-      byte[] buffer = new byte[4096];
-      long totalRead = 0;
-
-      // 3. Ler exatamente o número de bytes esperado
-      while (totalRead < fileSize) {
-        int bytesToRead = (int) Math.min(buffer.length, fileSize - totalRead);
-        int bytesRead = inStream.read(buffer, 0, bytesToRead);
-
-        if (bytesRead == -1)
-          break;
-
-        fos.write(buffer, 0, bytesRead);
-        memoryCopy.write(buffer, 0, bytesRead);
-        totalRead += bytesRead;
-      }
-
-      fos.close();
+      Files.write(outputFile.toPath(), CryptoUtils.stringToBytes(plaintext.toString()));
 
       // Mostrar conteúdo recebido no terminal
-      String content = memoryCopy.toString();
       System.out.println("Conteúdo recebido:");
-      System.out.println(content);
+      System.out.println(plaintext.toString());
 
       System.out.println("Ficheiro recebido com sucesso!");
     } else if (response.equalsIgnoreCase("NOHM")) {
@@ -594,8 +589,12 @@ public class SpertaClient {
   private static void receive_device_log_file(String home, String device) throws IOException {
     String response = inStream.readUTF();
     if (response.equals("OK")) {
-      long fileSize = inStream.readLong();
-      System.out.printf("OK, %d (long).%n", fileSize);
+      String section = inStream.readUTF();
+      javax.crypto.SecretKey sectionKey = readSectionKey();
+      byte[] encryptedData = readByteBlock();
+      String encryptedContent = CryptoUtils.bytesToString(encryptedData);
+      String decryptedContent = decryptRhContent(encryptedContent, sectionKey);
+      System.out.printf("OK, secção %s recebida.%n", section);
 
       // Abrir ficheiro para gravar
       File outputFile = new File("client/" + home + "_" + device + "_log.csv");
@@ -603,25 +602,10 @@ public class SpertaClient {
       if (parent != null && !parent.exists()) {
         parent.mkdirs();
       }
-      FileOutputStream fos = new FileOutputStream(outputFile);
-      java.io.ByteArrayOutputStream memoryCopy = new java.io.ByteArrayOutputStream((int) fileSize);
-
-      byte[] buffer = new byte[4096];
-      long totalRead = 0;
-      while (totalRead < fileSize) {
-        int toRead = (int) Math.min(buffer.length, fileSize - totalRead);
-        int read = inStream.read(buffer, 0, toRead);
-        if (read == -1)
-          break;
-        fos.write(buffer, 0, read);
-        memoryCopy.write(buffer, 0, read);
-        totalRead += read;
-      }
-
-      fos.close();
+      Files.write(outputFile.toPath(), CryptoUtils.stringToBytes(decryptedContent));
 
       System.out.println("Conteúdo recebido:");
-      System.out.println(memoryCopy.toString());
+      System.out.println(decryptedContent);
       System.out.println("Ficheiro do dispositivo recebido com sucesso!");
 
     } else {
@@ -642,6 +626,101 @@ public class SpertaClient {
         default:
           System.out.println("Resposta desconhecida do servidor.");
       }
+    }
+  }
+
+  private static javax.crypto.SecretKey readSectionKey() throws IOException {
+    int keySize = inStream.readInt();
+    if (keySize <= 0) {
+      throw new IOException("Invalid section key size");
+    }
+
+    byte[] encryptedSectionKey = inStream.readNBytes(keySize);
+    if (encryptedSectionKey.length != keySize) {
+      throw new IOException("Incomplete section key received");
+    }
+
+    try {
+      PrivateKey privateKey = CryptoUtils.getPrivateKeyFromKeystore(
+          keystore,
+          passwordKeystore,
+          userId,
+          passwordKeystore
+      );
+      byte[] sectionKeyBytes = CryptoUtils.decryptRSA(encryptedSectionKey, privateKey);
+      return CryptoUtils.bytesToAESKey(sectionKeyBytes);
+    } catch (Exception e) {
+      throw new IOException("Erro ao decifrar chave da secção: " + e.getMessage(), e);
+    }
+  }
+
+  private static byte[] readByteBlock() throws IOException {
+    long dataSize = inStream.readLong();
+    if (dataSize < 0 || dataSize > Integer.MAX_VALUE) {
+      throw new IOException("Invalid data size");
+    }
+
+    byte[] data = inStream.readNBytes((int) dataSize);
+    if (data.length != dataSize) {
+      throw new IOException("Incomplete data received");
+    }
+    return data;
+  }
+
+  private static String decryptRtSectionContent(String encryptedContent, javax.crypto.SecretKey sectionKey)
+      throws IOException {
+    StringBuilder plaintext = new StringBuilder();
+    String[] lines = encryptedContent.split("\\R");
+    for (String line : lines) {
+      if (line.isBlank()) {
+        continue;
+      }
+
+      String[] parts = line.split(";", -1);
+      if (parts.length >= 3) {
+        parts[2] = decryptBase64Value(parts[2], sectionKey);
+        line = String.join(";", parts);
+      }
+
+      if (plaintext.length() > 0) {
+        plaintext.append(System.lineSeparator());
+      }
+      plaintext.append(line);
+    }
+    return plaintext.toString();
+  }
+
+  private static String decryptRhContent(String encryptedContent, javax.crypto.SecretKey sectionKey)
+      throws IOException {
+    StringBuilder plaintext = new StringBuilder();
+    String[] lines = encryptedContent.split("\\R");
+    for (String line : lines) {
+      if (line.isBlank()) {
+        continue;
+      }
+
+      String[] parts = line.split(",", -1);
+      if (parts.length >= 4) {
+        parts[3] = decryptBase64Value(parts[3], sectionKey);
+        line = String.join(",", parts);
+      }
+
+      if (plaintext.length() > 0) {
+        plaintext.append(System.lineSeparator());
+      }
+      plaintext.append(line);
+    }
+    return plaintext.toString();
+  }
+
+  private static String decryptBase64Value(String encryptedValueBase64, javax.crypto.SecretKey sectionKey)
+      throws IOException {
+    try {
+      byte[] encryptedValue = Base64.getDecoder().decode(encryptedValueBase64);
+      byte[] plaintextValue = CryptoUtils.decryptAES(encryptedValue, sectionKey);
+      return CryptoUtils.bytesToString(plaintextValue);
+    } catch (Exception e) {
+      throw new IOException("Erro ao decifrar valor: " + e.getMessage(), e);
     }
   }
 
