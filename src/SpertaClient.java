@@ -196,7 +196,10 @@ public class SpertaClient {
       
       if(mensagem[0].equalsIgnoreCase("CREATE")) {
         receiveCreateResponseAndSendSectionKeys(mensagem[1]);
-      } else if (mensagem[0].equalsIgnoreCase("RT")) {
+      }else if(mensagem[0].equalsIgnoreCase("ADD")){
+        receiveAddResponseAndShareSectionKey(mensagem[1], mensagem[2], mensagem[3]);
+      } 
+      else if (mensagem[0].equalsIgnoreCase("RT")) {
         receive_home_devices_file(mensagem[1]);
       } else if (mensagem[0].equalsIgnoreCase("RH")) {
         receive_device_log_file(mensagem[1], mensagem[2]);
@@ -465,6 +468,113 @@ public class SpertaClient {
 
     outStream.writeLong(certBytes.length);
     outStream.write(certBytes);
+    outStream.flush();
+  }
+
+  private static boolean hasUserCertificate(String user) {
+    Path certPath = Paths.get("userCerts", user + ".cert");
+    return Files.exists(certPath);
+  }
+
+  private static void requestCertificateFromServer(String user) throws IOException {
+    outStream.writeUTF("GETCERT");
+    outStream.writeUTF(user);
+    outStream.flush();
+
+    String response = inStream.readUTF();
+    if (!response.equals("OK")) {
+        throw new IOException("Could not get certificate for user " + user);
+    }
+
+    long certSize = inStream.readLong();
+    byte[] certBytes = inStream.readNBytes((int) certSize);
+
+    File certDir = new File("userCerts");
+    if (!certDir.exists()) {
+        certDir.mkdirs();
+    }
+    Path certPath = certDir.toPath().resolve(user + ".cert");
+    Files.write(certPath, certBytes);
+    System.out.println("Certificate for user " + user + " saved to " + certPath);
+  }
+
+  private static void receiveAddResponseAndShareSectionKey(String user, String home, String section)
+    throws IOException {
+
+    String response = inStream.readUTF();
+    System.out.println(response);
+
+    if (!response.equalsIgnoreCase("OK")) {
+      return;
+    }
+
+    try {
+      if (!hasUserCertificate(user)) {
+        requestCertificateFromServer(user);
+      }
+
+      byte[] encryptedKeyForOwner = requestSectionKeyFromServer(home, section);
+      reEncryptAndSendSectionKeyForUser(user, home, section, encryptedKeyForOwner);
+
+      String finalResponse = inStream.readUTF();
+      System.out.println(finalResponse);
+
+    } catch (Exception e) {
+      throw new IOException("Erro ao partilhar chave da secção no ADD: " + e.getMessage(), e);
+    }
+  }
+
+  private static byte[] requestSectionKeyFromServer(String home, String section) throws IOException {
+      outStream.writeUTF("GETSECTIONKEY");
+      outStream.writeUTF(home);
+      outStream.writeUTF(section);
+      outStream.flush();
+
+      String response = inStream.readUTF();
+      if (!response.equals("OK")) {
+        throw new IOException("Could not get section key for " + home + "/" + section);
+      }
+
+      int keySize = inStream.readInt();
+      if (keySize <= 0) {
+        throw new IOException("Invalid section key size received");
+      }
+
+      byte[] encryptedKey = inStream.readNBytes(keySize);
+      if (encryptedKey.length != keySize) {
+        throw new IOException("Incomplete section key received");
+      }
+
+      return encryptedKey;
+    }
+
+  private static void reEncryptAndSendSectionKeyForUser(
+      String targetUser,
+      String home,
+      String section,
+      byte[] encryptedKeyForOwner) throws Exception {
+
+    java.security.PrivateKey ownerPrivateKey = CryptoUtils.getPrivateKeyFromKeystore(
+        keystore,
+        passwordKeystore,
+        userId,
+        passwordKeystore
+    );
+
+    byte[] sectionKeyBytes = CryptoUtils.decryptRSA(encryptedKeyForOwner, ownerPrivateKey);
+
+    java.security.PublicKey targetUserPublicKey = CryptoUtils.getPublicKeyFromCertificate(
+        Paths.get("userCerts", targetUser + ".cert")
+    );
+
+    byte[] encryptedKeyForTargetUser = CryptoUtils.encryptRSA(sectionKeyBytes, targetUserPublicKey);
+
+    outStream.writeUTF("STORESECTIONKEY");
+    outStream.writeUTF(home);
+    outStream.writeUTF(section);
+    outStream.writeUTF(targetUser);
+    outStream.writeInt(encryptedKeyForTargetUser.length);
+    outStream.write(encryptedKeyForTargetUser);
     outStream.flush();
   }
 }
