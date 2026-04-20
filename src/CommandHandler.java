@@ -243,6 +243,118 @@ public class CommandHandler {
   }
 
   /**
+   * Envia ao owner autenticado o certificado de outro utilizador.
+   */
+  public synchronized void requestUserCertificate(ObjectOutputStream outStream, ObjectInputStream inStream)
+      throws IOException {
+    String user = inStream.readUTF();
+    if (!userExists(user)) {
+      outStream.writeUTF(ServerResponse.NOUSER.name());
+      outStream.flush();
+      return;
+    }
+
+    File certFile = new File("server/certs", user + ".cert");
+    if (!certFile.exists()) {
+      outStream.writeUTF(ServerResponse.NODATA.name());
+      outStream.flush();
+      return;
+    }
+
+    FileIntegraty.verifyIntegrityOrExit(certFile.getPath());
+    byte[] certBytes = Files.readAllBytes(certFile.toPath());
+    outStream.writeUTF(ServerResponse.OK.name());
+    outStream.writeLong(certBytes.length);
+    outStream.write(certBytes);
+    outStream.flush();
+  }
+
+  /**
+   * Envia ao owner a chave da secção cifrada com a chave pública do próprio owner.
+   */
+  public synchronized void requestOwnerSectionKey(ObjectOutputStream outStream, ObjectInputStream inStream)
+      throws IOException {
+    String homeName = inStream.readUTF();
+    String section = inStream.readUTF();
+
+    loadHomesFromDisk();
+    if (!findHome(homeName)) {
+      outStream.writeUTF(ServerResponse.NOHM.name());
+      outStream.flush();
+      return;
+    }
+
+    Home home = getHome(homeName);
+    if (!home.owner.equals(currentUser)) {
+      outStream.writeUTF(ServerResponse.NOPERM.name());
+      outStream.flush();
+      return;
+    }
+
+    File keyFile = findEncryptedSectionKey(homeName, section, currentUser);
+    if (keyFile == null || !keyFile.exists()) {
+      outStream.writeUTF(ServerResponse.NODATA.name());
+      outStream.flush();
+      return;
+    }
+
+    FileIntegraty.verifyIntegrityOrExit(keyFile.getPath());
+    byte[] encryptedKey = Files.readAllBytes(keyFile.toPath());
+    outStream.writeUTF(ServerResponse.OK.name());
+    outStream.writeInt(encryptedKey.length);
+    outStream.write(encryptedKey);
+    outStream.flush();
+  }
+
+  /**
+   * Guarda a chave de secção recebida do owner, cifrada com a chave pública do utilizador alvo.
+   */
+  public synchronized void storeSectionKeyForUser(ObjectOutputStream outStream, ObjectInputStream inStream)
+      throws IOException {
+    String user = inStream.readUTF();
+    String homeName = inStream.readUTF();
+    String section = inStream.readUTF();
+    int keySize = inStream.readInt();
+
+    if (keySize <= 0) {
+      outStream.writeUTF(ServerResponse.NOK.name());
+      outStream.flush();
+      return;
+    }
+
+    byte[] encryptedKey = inStream.readNBytes(keySize);
+    if (encryptedKey.length != keySize) {
+      outStream.writeUTF(ServerResponse.NOK.name());
+      outStream.flush();
+      return;
+    }
+
+    if (!userExists(user)) {
+      outStream.writeUTF(ServerResponse.NOUSER.name());
+      outStream.flush();
+      return;
+    }
+
+    loadHomesFromDisk();
+    if (!findHome(homeName)) {
+      outStream.writeUTF(ServerResponse.NOHM.name());
+      outStream.flush();
+      return;
+    }
+
+    Home home = getHome(homeName);
+    if (!home.owner.equals(currentUser)) {
+      outStream.writeUTF(ServerResponse.NOPERM.name());
+      outStream.flush();
+      return;
+    }
+
+    storeEncryptedSectionKey(homeName, section, user, encryptedKey);
+    outStream.writeUTF(ServerResponse.OK.name());
+    outStream.flush();
+  }
+
+  /**
    * Verifica se um utilizador está registado no ficheiro de utilizadores.
    */
   private static Boolean userExists(String user) {
@@ -338,6 +450,26 @@ public class CommandHandler {
       throw new IOException("Invalid section identifier");
     }
     return String.valueOf(parsedSection.name().charAt(0));
+  }
+
+  private File findEncryptedSectionKey(String homeName, String section, String user) throws IOException {
+    Section parsedSection = Section.parseSection(section);
+    if (parsedSection == null) {
+      return null;
+    }
+
+    String sectionCode = String.valueOf(parsedSection.name().charAt(0));
+    File shortNameFile = new File(SECTION_KEYS_DIR, "key." + homeName + "." + sectionCode + "." + user);
+    if (shortNameFile.exists()) {
+      return shortNameFile;
+    }
+
+    File legacyNameFile = new File(SECTION_KEYS_DIR, "key." + homeName + "." + parsedSection.name() + "." + user);
+    if (legacyNameFile.exists()) {
+      return legacyNameFile;
+    }
+
+    return null;
   }
 
   private void receiveAndStoreSectionKeysForCreate(ObjectInputStream inStream, String homeName, String owner)

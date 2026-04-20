@@ -170,6 +170,15 @@ class ServerThread extends Thread {
           case RH:
             commandHandler.requestDeviceLog(outStream, inStream);
             break;
+          case GETCERT:
+            commandHandler.requestUserCertificate(outStream, inStream);
+            break;
+          case GETKEY:
+            commandHandler.requestOwnerSectionKey(outStream, inStream);
+            break;
+          case STOREKEY:
+            commandHandler.storeSectionKeyForUser(outStream, inStream);
+            break;
           default:
             break;
         }

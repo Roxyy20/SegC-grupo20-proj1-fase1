@@ -6,7 +6,10 @@ import java.io.ObjectOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Scanner;
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
@@ -196,6 +199,8 @@ public class SpertaClient {
       
       if(mensagem[0].equalsIgnoreCase("CREATE")) {
         receiveCreateResponseAndSendSectionKeys(mensagem[1]);
+      } else if (mensagem[0].equalsIgnoreCase("ADD")) {
+        receiveAddResponseAndSendSectionKey(mensagem[1], mensagem[2], mensagem[3]);
       } else if (mensagem[0].equalsIgnoreCase("RT")) {
         receive_home_devices_file(mensagem[1]);
       } else if (mensagem[0].equalsIgnoreCase("RH")) {
@@ -300,6 +305,131 @@ public class SpertaClient {
     }
 
     outStream.flush();
+  }
+
+  /**
+   * Depois de um ADD aceite pelo servidor, envia a chave da secção cifrada para
+   * o utilizador adicionado.
+   */
+  private static void receiveAddResponseAndSendSectionKey(String targetUser, String home, String section)
+      throws IOException {
+    String response = inStream.readUTF();
+    if (!response.equalsIgnoreCase(ServerResponse.OK.name())) {
+      System.out.println(response);
+      return;
+    }
+
+    try {
+      Path targetCertPath = ensureUserCertificate(targetUser);
+      PublicKey targetPublicKey = CryptoUtils.getPublicKeyFromCertificate(targetCertPath);
+      PrivateKey ownerPrivateKey = CryptoUtils.getPrivateKeyFromKeystore(
+          keystore,
+          passwordKeystore,
+          userId,
+          passwordKeystore
+      );
+
+      for (String sectionCode : sectionCodesForAdd(section)) {
+        byte[] encryptedForOwner = requestOwnerSectionKey(home, sectionCode);
+        byte[] sectionKeyBytes = CryptoUtils.decryptRSA(encryptedForOwner, ownerPrivateKey);
+        byte[] encryptedForTarget = CryptoUtils.encryptRSA(sectionKeyBytes, targetPublicKey);
+        String storeResponse = storeSectionKeyForUser(targetUser, home, sectionCode, encryptedForTarget);
+        if (!storeResponse.equalsIgnoreCase(ServerResponse.OK.name())) {
+          System.out.println(storeResponse);
+          return;
+        }
+      }
+
+      System.out.println(ServerResponse.OK.name());
+    } catch (Exception e) {
+      throw new IOException("Erro ao enviar chave de secção para utilizador: " + e.getMessage(), e);
+    }
+  }
+
+  private static List<String> sectionCodesForAdd(String section) throws IOException {
+    List<String> sectionCodes = new ArrayList<>();
+    if (section.equalsIgnoreCase("all")) {
+      for (Section value : Section.values()) {
+        sectionCodes.add(String.valueOf(value.name().charAt(0)));
+      }
+      return sectionCodes;
+    }
+
+    Section parsedSection = Section.parseSection(section);
+    if (parsedSection == null) {
+      throw new IOException("Invalid section identifier");
+    }
+    sectionCodes.add(String.valueOf(parsedSection.name().charAt(0)));
+    return sectionCodes;
+  }
+
+  private static Path ensureUserCertificate(String targetUser) throws IOException {
+    Path certPath = Paths.get("userCerts", targetUser + ".cert");
+    if (Files.exists(certPath)) {
+      return certPath;
+    }
+
+    outStream.writeUTF(Command.GETCERT.name());
+    outStream.writeUTF(targetUser);
+    outStream.flush();
+
+    String response = inStream.readUTF();
+    if (!response.equalsIgnoreCase(ServerResponse.OK.name())) {
+      throw new IOException(response);
+    }
+
+    long certSize = inStream.readLong();
+    if (certSize <= 0 || certSize > Integer.MAX_VALUE) {
+      throw new IOException("Invalid certificate size");
+    }
+
+    byte[] certBytes = inStream.readNBytes((int) certSize);
+    if (certBytes.length != certSize) {
+      throw new IOException("Incomplete certificate received");
+    }
+
+    Path parent = certPath.getParent();
+    if (parent != null && !Files.exists(parent)) {
+      Files.createDirectories(parent);
+    }
+    Files.write(certPath, certBytes);
+    return certPath;
+  }
+
+  private static byte[] requestOwnerSectionKey(String home, String section) throws IOException {
+    outStream.writeUTF(Command.GETKEY.name());
+    outStream.writeUTF(home);
+    outStream.writeUTF(section);
+    outStream.flush();
+
+    String response = inStream.readUTF();
+    if (!response.equalsIgnoreCase(ServerResponse.OK.name())) {
+      throw new IOException(response);
+    }
+
+    int keySize = inStream.readInt();
+    if (keySize <= 0) {
+      throw new IOException("Invalid section key size");
+    }
+
+    byte[] encryptedKey = inStream.readNBytes(keySize);
+    if (encryptedKey.length != keySize) {
+      throw new IOException("Incomplete section key received");
+    }
+    return encryptedKey;
+  }
+
+  private static String storeSectionKeyForUser(String targetUser, String home, String section, byte[] encryptedKey)
+      throws IOException {
+    outStream.writeUTF(Command.STOREKEY.name());
+    outStream.writeUTF(targetUser);
+    outStream.writeUTF(home);
+    outStream.writeUTF(section);
+    outStream.writeInt(encryptedKey.length);
+    outStream.write(encryptedKey);
+    outStream.flush();
+
+    return inStream.readUTF();
   }
 
 

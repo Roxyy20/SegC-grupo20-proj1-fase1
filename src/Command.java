@@ -9,7 +9,10 @@ public enum Command {
     RD,
     EC,
     RT,
-    RH;
+    RH,
+    GETCERT,
+    GETKEY,
+    STOREKEY;
 
     /**
      * Converte texto introduzido pelo utilizador no comando correspondente.
