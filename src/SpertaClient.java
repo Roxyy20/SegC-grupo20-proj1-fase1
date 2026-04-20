@@ -201,6 +201,8 @@ public class SpertaClient {
         receiveCreateResponseAndSendSectionKeys(mensagem[1]);
       } else if (mensagem[0].equalsIgnoreCase("ADD")) {
         receiveAddResponseAndSendSectionKey(mensagem[1], mensagem[2], mensagem[3]);
+      } else if (mensagem[0].equalsIgnoreCase("EC")) {
+        receiveEcResponseAndSendEncryptedValue(mensagem[3]);
       } else if (mensagem[0].equalsIgnoreCase("RT")) {
         receive_home_devices_file(mensagem[1]);
       } else if (mensagem[0].equalsIgnoreCase("RH")) {
@@ -246,11 +248,23 @@ public class SpertaClient {
       System.out.println("Comando RD requer 2 argumentos: <hm> <s>");
       return false;
     }
+    if (cmdEnum == Command.EC) {
+      try {
+        int value = Integer.parseInt(parts[3]);
+        if (value < 0 || value > 600) {
+          System.out.println("Valor de EC deve estar entre 0 e 600");
+          return false;
+        }
+      } catch (NumberFormatException e) {
+        System.out.println("Valor de EC deve ser um inteiro");
+        return false;
+      }
+    }
+
     outStream.writeUTF(command);
     if (cmdEnum == Command.EC) {
       outStream.writeUTF(parts[1]); // home
       outStream.writeUTF(parts[2]); // device
-      outStream.writeInt(Integer.parseInt(parts[3])); // value
     } else {
       for (int i = 1; i < parts.length; i++) {
         outStream.writeUTF(parts[i]);
@@ -430,6 +444,48 @@ public class SpertaClient {
     outStream.flush();
 
     return inStream.readUTF();
+  }
+
+  /**
+   * Completa o EC: recebe a chave da secção cifrada para o utilizador, decifra-a
+   * e envia o valor cifrado com AES.
+   */
+  private static void receiveEcResponseAndSendEncryptedValue(String value) throws IOException {
+    String response = inStream.readUTF();
+    if (!response.equalsIgnoreCase(ServerResponse.OK.name())) {
+      System.out.println(response);
+      return;
+    }
+
+    try {
+      int encryptedKeySize = inStream.readInt();
+      if (encryptedKeySize <= 0) {
+        throw new IOException("Invalid section key size");
+      }
+
+      byte[] encryptedSectionKey = inStream.readNBytes(encryptedKeySize);
+      if (encryptedSectionKey.length != encryptedKeySize) {
+        throw new IOException("Incomplete section key received");
+      }
+
+      PrivateKey privateKey = CryptoUtils.getPrivateKeyFromKeystore(
+          keystore,
+          passwordKeystore,
+          userId,
+          passwordKeystore
+      );
+      byte[] sectionKeyBytes = CryptoUtils.decryptRSA(encryptedSectionKey, privateKey);
+      javax.crypto.SecretKey sectionKey = CryptoUtils.bytesToAESKey(sectionKeyBytes);
+      byte[] encryptedValue = CryptoUtils.encryptAES(CryptoUtils.stringToBytes(value), sectionKey);
+
+      outStream.writeInt(encryptedValue.length);
+      outStream.write(encryptedValue);
+      outStream.flush();
+
+      System.out.println(inStream.readUTF());
+    } catch (Exception e) {
+      throw new IOException("Erro ao cifrar valor EC: " + e.getMessage(), e);
+    }
   }
 
 

@@ -8,6 +8,7 @@ import java.io.ObjectOutputStream;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
 import java.text.SimpleDateFormat;
+import java.util.Base64;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -152,7 +153,6 @@ public class CommandHandler {
       throws IOException {
     String homeName = inStream.readUTF();
     String device = inStream.readUTF();
-    int value = inStream.readInt();
 
     loadHomesFromDisk();
     if (!findHome(homeName)) {
@@ -162,30 +162,63 @@ public class CommandHandler {
     }
     Home home = getHome(homeName);
 
-    ServerResponse res = home.setStateOrTimer(device, value, currentUser);
-
-    outStream.writeUTF(res.name());
-    outStream.flush();
-    if (res == ServerResponse.OK) {
-      File deviceLog = new File("server/" + homeName + "_" + device + ".csv");
-      File parent = deviceLog.getParentFile();
-      if (parent != null && !parent.exists()) {
-        parent.mkdirs();
-      }
-      FileIntegraty.ensureFileAndHashOrExit(deviceLog.getPath());
-      FileIntegraty.verifyIntegrityOrExit(deviceLog.getPath());
-      try (FileWriter writer = new FileWriter(deviceLog, true)) {
-        Date currentUserData = new Date();
-        String data = new SimpleDateFormat("yyyy-MM-dd").format(currentUserData);
-        String time = new SimpleDateFormat("HH:mm:ss").format(currentUserData);
-        writer.write(String.format("%s,%s,%s,%d", data, time, currentUser, value));
-        writer.write(System.lineSeparator());
-      } catch (IOException e) {
-        e.printStackTrace();
-      }
-      FileIntegraty.updateHashOrExit(deviceLog.getPath());
-      updateLastStatesFile(homeName, device, value, currentUser);
+    ServerResponse res = home.canAccessDevice(device, currentUser);
+    if (res != ServerResponse.OK) {
+      outStream.writeUTF(res.name());
+      outStream.flush();
+      return;
     }
+
+    File keyFile = findEncryptedSectionKey(homeName, deviceSectionCode(device), currentUser);
+    if (keyFile == null || !keyFile.exists()) {
+      outStream.writeUTF(ServerResponse.NODATA.name());
+      outStream.flush();
+      return;
+    }
+
+    FileIntegraty.verifyIntegrityOrExit(keyFile.getPath());
+    byte[] encryptedSectionKey = Files.readAllBytes(keyFile.toPath());
+    outStream.writeUTF(ServerResponse.OK.name());
+    outStream.writeInt(encryptedSectionKey.length);
+    outStream.write(encryptedSectionKey);
+    outStream.flush();
+
+    int encryptedValueSize = inStream.readInt();
+    if (encryptedValueSize <= 0) {
+      outStream.writeUTF(ServerResponse.NOK.name());
+      outStream.flush();
+      return;
+    }
+
+    byte[] encryptedValue = inStream.readNBytes(encryptedValueSize);
+    if (encryptedValue.length != encryptedValueSize) {
+      outStream.writeUTF(ServerResponse.NOK.name());
+      outStream.flush();
+      return;
+    }
+
+    String encryptedValueBase64 = Base64.getEncoder().encodeToString(encryptedValue);
+    File deviceLog = new File("server/" + homeName + "_" + device + ".csv");
+    File parent = deviceLog.getParentFile();
+    if (parent != null && !parent.exists()) {
+      parent.mkdirs();
+    }
+    FileIntegraty.ensureFileAndHashOrExit(deviceLog.getPath());
+    FileIntegraty.verifyIntegrityOrExit(deviceLog.getPath());
+    try (FileWriter writer = new FileWriter(deviceLog, true)) {
+      Date currentUserData = new Date();
+      String data = new SimpleDateFormat("yyyy-MM-dd").format(currentUserData);
+      String time = new SimpleDateFormat("HH:mm:ss").format(currentUserData);
+      writer.write(String.format("%s,%s,%s,%s", data, time, currentUser, encryptedValueBase64));
+      writer.write(System.lineSeparator());
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+    FileIntegraty.updateHashOrExit(deviceLog.getPath());
+    updateLastStatesFile(homeName, device, encryptedValueBase64, currentUser);
+
+    outStream.writeUTF(ServerResponse.OK.name());
+    outStream.flush();
   }
 
   /**
@@ -472,6 +505,13 @@ public class CommandHandler {
     return null;
   }
 
+  private String deviceSectionCode(String device) throws IOException {
+    if (device == null || device.isBlank()) {
+      throw new IOException("Invalid device identifier");
+    }
+    return String.valueOf(Character.toUpperCase(device.charAt(0)));
+  }
+
   private void receiveAndStoreSectionKeysForCreate(ObjectInputStream inStream, String homeName, String owner)
       throws IOException {
 
@@ -577,7 +617,7 @@ public class CommandHandler {
   /**
    * Atualiza o ficheiro que guarda o último estado conhecido de cada dispositivo.
    */
-  private void updateLastStatesFile(String homeName, String device, int value, String user) {
+  private void updateLastStatesFile(String homeName, String device, String encryptedValue, String user) {
     File file = new File(DEVICES_FILE);
     File parent = file.getParentFile();
     if (parent != null && !parent.exists()) {
@@ -605,7 +645,7 @@ public class CommandHandler {
 
     String key = homeName + ";" + device;
     String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
-    String newLine = String.format("%s;%s;%d;%s;%s", homeName, device, value, timestamp, user);
+    String newLine = String.format("%s;%s;%s;%s;%s", homeName, device, encryptedValue, timestamp, user);
     latest.put(key, newLine);
 
     try (FileWriter writer = new FileWriter(file, false)) {
