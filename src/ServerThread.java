@@ -345,6 +345,5 @@ class ServerThread extends Thread {
 
     File certFile = new File(certDir, user + ".cert");
     Files.write(certFile.toPath(), certBytes);
-    FileIntegraty.updateHashOrExit(certFile.getPath());
   }
 }

@@ -329,7 +329,6 @@ public class CommandHandler {
       return;
     }
 
-    FileIntegraty.verifyIntegrityOrExit(certFile.getPath());
     byte[] certBytes = Files.readAllBytes(certFile.toPath());
     outStream.writeUTF(ServerResponse.OK.name());
     outStream.writeLong(certBytes.length);
