@@ -198,6 +198,9 @@ public class SpertaServer {
       return;
     }
 
+    // Por decisão de implementação deste projeto:
+    // a verificação global de integridade cobre ficheiros de dados do servidor
+    // e exclui material de certificados/chaves partilhadas por utilizadores.
     Path sectionKeysDir = dir.resolve("sectionKeys").normalize();
     Path certsDir = dir.resolve("certs").normalize();
     Path saltPath = dir.resolve("server.salt").normalize();
