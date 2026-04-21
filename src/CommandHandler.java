@@ -77,7 +77,6 @@ public class CommandHandler {
     }
 
     FileIntegraty.verifyIntegrityOrExit(deviceLogFile.getPath());
-    FileIntegraty.verifyIntegrityOrExit(keyFile.getPath());
     byte[] encryptedSectionKey = Files.readAllBytes(keyFile.toPath());
     byte[] data = Files.readAllBytes(deviceLogFile.toPath());
 
@@ -168,7 +167,6 @@ public class CommandHandler {
       for (Map.Entry<String, StringBuilder> entry : dataBySection.entrySet()) {
         String section = entry.getKey();
         File keyFile = findEncryptedSectionKey(homeName, section, currentUser);
-        FileIntegraty.verifyIntegrityOrExit(keyFile.getPath());
         byte[] encryptedSectionKey = Files.readAllBytes(keyFile.toPath());
         byte[] sectionData = entry.getValue().toString().getBytes(StandardCharsets.UTF_8);
 
@@ -214,7 +212,6 @@ public class CommandHandler {
       return;
     }
 
-    FileIntegraty.verifyIntegrityOrExit(keyFile.getPath());
     byte[] encryptedSectionKey = Files.readAllBytes(keyFile.toPath());
     outStream.writeUTF(ServerResponse.OK.name());
     outStream.writeInt(encryptedSectionKey.length);
@@ -369,7 +366,6 @@ public class CommandHandler {
       return;
     }
 
-    FileIntegraty.verifyIntegrityOrExit(keyFile.getPath());
     byte[] encryptedKey = Files.readAllBytes(keyFile.toPath());
     outStream.writeUTF(ServerResponse.OK.name());
     outStream.writeInt(encryptedKey.length);
@@ -512,7 +508,6 @@ public class CommandHandler {
     File keyFile = new File(dir, "key." + homeName + "." + sectionCode + "." + owner);
     Files.write(keyFile.toPath(), encryptedKey);
 
-    FileIntegraty.updateHashOrExit(keyFile.getPath());
   }
 
   private String sectionKeyCode(String section) throws IOException {
@@ -638,17 +633,10 @@ public class CommandHandler {
     if (!legacy.equals(homesFile) && legacy.exists()) {
       try {
         Files.move(legacy.toPath(), homesFile.toPath(), StandardCopyOption.REPLACE_EXISTING);
-        return;
       } catch (IOException e) {
-        // fall through to create empty file
+        // fallback: o bootstrap do ficheiro/hash é feito em ensureFileAndHashOrExit
         e.printStackTrace();
       }
-    }
-
-    try {
-      homesFile.createNewFile();
-    } catch (IOException e) {
-      e.printStackTrace();
     }
   }
 

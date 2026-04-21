@@ -103,11 +103,13 @@ public class FileIntegraty {
     if (!Files.exists(dir)) {
       return;
     }
+    Path sectionKeysDir = dir.resolve("sectionKeys").normalize();
 
     try (Stream<Path> stream = Files.walk(dir)) {
       stream
           .filter(Files::isRegularFile)
           .filter(path -> !path.toString().endsWith(".hash"))
+          .filter(path -> !path.normalize().startsWith(sectionKeysDir))
           .forEach(path -> verifyIntegrityOrExit(path.toString()));
     } catch (IOException e) {
       failIntegrityAndExit();
