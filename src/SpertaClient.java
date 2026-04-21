@@ -5,8 +5,10 @@ import java.io.ObjectOutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.KeyStore;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.cert.Certificate;
 import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
@@ -29,6 +31,8 @@ public class SpertaClient {
   private static final Scanner STDIN = new Scanner(System.in);
 
   // dados necessários para crypto / keystore
+  private static String truststorePath;
+  private static String passwordTruststore;
   private static String keystore;
   private static String passwordKeystore;
   private static String userId;
@@ -61,14 +65,14 @@ public class SpertaClient {
           System.out.format("'%s' id not a valid port format. Using default value of 22345\n", values[1]);
         }
       }
-      String truststore = args[1];
-      String passwordTruststore = args[2];
+      truststorePath = args[1];
+      passwordTruststore = args[2];
       keystore = args[3];
       passwordKeystore = args[4];
       userId = args[5];
       String password = args[6];
 
-      System.setProperty("javax.net.ssl.trustStore", truststore);
+      System.setProperty("javax.net.ssl.trustStore", truststorePath);
       System.setProperty("javax.net.ssl.trustStorePassword", passwordTruststore);
       System.setProperty("javax.net.ssl.keyStore", keystore);
       System.setProperty("javax.net.ssl.keyStorePassword", passwordKeystore);
@@ -379,6 +383,7 @@ public class SpertaClient {
   private static Path ensureUserCertificate(String targetUser) throws IOException {
     Path certPath = Paths.get("userCerts", targetUser + ".cert");
     if (Files.exists(certPath)) {
+      ensureCertificateInTruststore(certPath, targetUser);
       return certPath;
     }
 
@@ -406,7 +411,35 @@ public class SpertaClient {
       Files.createDirectories(parent);
     }
     Files.write(certPath, certBytes);
+    ensureCertificateInTruststore(certPath, targetUser);
     return certPath;
+  }
+
+  private static void ensureCertificateInTruststore(Path certPath, String targetUser) throws IOException {
+    try {
+      Certificate certificate = CryptoUtils.readCertificate(certPath);
+      String alias = "user." + targetUser;
+      Path path = Paths.get(truststorePath);
+      KeyStore truststore = KeyStore.getInstance(KeyStore.getDefaultType());
+      if (Files.exists(path)) {
+        try (java.io.InputStream in = Files.newInputStream(path)) {
+          truststore.load(in, passwordTruststore.toCharArray());
+        }
+      } else {
+        truststore.load(null, passwordTruststore.toCharArray());
+      }
+
+      truststore.setCertificateEntry(alias, certificate);
+      Path parent = path.getParent();
+      if (parent != null && !Files.exists(parent)) {
+        Files.createDirectories(parent);
+      }
+      try (java.io.OutputStream out = Files.newOutputStream(path)) {
+        truststore.store(out, passwordTruststore.toCharArray());
+      }
+    } catch (Exception e) {
+      throw new IOException("Erro ao guardar certificado na truststore: " + e.getMessage(), e);
+    }
   }
 
   private static byte[] requestOwnerSectionKey(String home, String section) throws IOException {
