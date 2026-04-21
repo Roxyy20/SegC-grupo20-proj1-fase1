@@ -6,10 +6,12 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
-import java.security.MessageDigest;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.security.MessageDigest;
+
+import javax.crypto.SecretKey;
 
 /**
  * Thread responsável por tratar uma ligação de cliente: atestação,
@@ -19,7 +21,7 @@ import java.nio.file.Paths;
  */
 class ServerThread extends Thread {
   private Socket socket = null;
-  private String passwordCifra;
+  private SecretKey pbeKey;
   private static final String APP_FILE = "server/apps.txt";
   private static final String USERS_FILE = "server/users.txt";
   private static final String REFERENCE_APP_ID = "SpertaClient";
@@ -30,9 +32,9 @@ class ServerThread extends Thread {
    *
    * @param inSoc socket da ligação do cliente
    */
-  ServerThread(Socket inSoc, String passwordCifra) {
+  ServerThread(Socket inSoc, SecretKey pbeKey) {
     socket = inSoc;
-    this.passwordCifra = passwordCifra;
+    this.pbeKey = pbeKey;
   }
 
   /**
@@ -85,10 +87,9 @@ class ServerThread extends Thread {
           byte[] saltBytes = SecurityUtils.fromBase64(storedSalt);
           String computedHash = SecurityUtils.hashPasswordWithSalt(pass, saltBytes);
 
-          if(storedHash.equals(computedHash)){
+          if (storedHash.equals(computedHash)) {
             authenticated = true;
-          }
-          else{
+          } else {
             outStream.writeUTF(LoginMessage.WrongPassword.name());
             outStream.flush();
             readNewPassword(outStream, inStream, storedHash, storedSalt);
@@ -103,8 +104,8 @@ class ServerThread extends Thread {
           // não deve acontecer, mas evitar enviar estado errado
           outStream.writeUTF(LoginMessage.WrongPassword.name());
         } else {
-        outStream.writeUTF(LoginMessage.OKUser.name());
-        outStream.flush();
+          outStream.writeUTF(LoginMessage.OKUser.name());
+          outStream.flush();
         }
       } else {
         outStream.writeUTF(LoginMessage.OKNewUser.name());
@@ -118,14 +119,14 @@ class ServerThread extends Thread {
         if (parent != null && !parent.exists()) {
           parent.mkdirs();
         }
-         try (FileWriter fileWriter = new FileWriter(usersFile, true)) {
+        try (FileWriter fileWriter = new FileWriter(usersFile, true)) {
           fileWriter.write(user + ":" + hashBase64 + ":" + saltBase64 + "\n");
         } catch (IOException e) {
           e.printStackTrace();
         }
-      FileIntegraty.updateHashOrExit(USERS_FILE);
-      outStream.flush();
-      receiveAndStoreCertificate(user, outStream, inStream);
+        FileIntegraty.updateHashOrExit(USERS_FILE);
+        outStream.flush();
+        receiveAndStoreCertificate(user, outStream, inStream);
       }
 
       CommandHandler commandHandler = new CommandHandler(user);
@@ -187,21 +188,22 @@ class ServerThread extends Thread {
    * Lê passwords adicionais enviadas pelo cliente até que coincida com a
    * registada.
    */
-  private void readNewPassword(ObjectOutputStream outStream, ObjectInputStream inStream, String storedHash, String storedSalt) throws Exception {
+  private void readNewPassword(ObjectOutputStream outStream, ObjectInputStream inStream, String storedHash,
+      String storedSalt) throws Exception {
     while (true) {
-        String newPass = inStream.readUTF();
+      String newPass = inStream.readUTF();
 
-        byte[] saltBytes = SecurityUtils.fromBase64(storedSalt);
-        String computedHash = SecurityUtils.hashPasswordWithSalt(newPass, saltBytes);
+      byte[] saltBytes = SecurityUtils.fromBase64(storedSalt);
+      String computedHash = SecurityUtils.hashPasswordWithSalt(newPass, saltBytes);
 
-        if (!computedHash.equals(storedHash)) {
-            outStream.writeUTF(LoginMessage.WrongPassword.name());
-            outStream.flush();
-        } else {
-            break;
-        }
+      if (!computedHash.equals(storedHash)) {
+        outStream.writeUTF(LoginMessage.WrongPassword.name());
+        outStream.flush();
+      } else {
+        break;
+      }
     }
-}
+  }
 
   /**
    * Realiza atestação anti-replay com nonce:
@@ -321,21 +323,21 @@ class ServerThread extends Thread {
   }
 
   private void receiveAndStoreCertificate(String user, ObjectOutputStream outStream, ObjectInputStream inStream)
-    throws IOException {
+      throws IOException {
 
     long certSize = inStream.readLong();
     if (certSize <= 0) {
-        throw new IOException("Invalid certificate size");
+      throw new IOException("Invalid certificate size");
     }
 
     byte[] certBytes = inStream.readNBytes((int) certSize);
     if (certBytes.length != certSize) {
-        throw new IOException("Incomplete certificate received");
+      throw new IOException("Incomplete certificate received");
     }
 
     File certDir = new File("server/certs");
     if (!certDir.exists()) {
-        certDir.mkdirs();
+      certDir.mkdirs();
     }
 
     File certFile = new File(certDir, user + ".cert");
