@@ -10,8 +10,12 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
+import java.util.concurrent.Callable;
+import java.util.Arrays;
 
+import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
 
 /**
  * Thread responsável por tratar uma ligação de cliente: atestação,
@@ -210,48 +214,54 @@ class ServerThread extends Thread {
    * cliente envia SHA256(nonce || SpertaClient.jar).
    */
   private boolean handleAttestation(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
-    FileIntegraty.verifyIntegrityOrExit(APP_FILE);
-    long nonce = SecurityUtils.generateNonce();
-    outStream.writeLong(nonce);
-    outStream.flush();
-
-    int hashSize = inStream.readInt();
-    if (hashSize != 32) {
-      outStream.writeUTF("NOKATTEST");
-      outStream.flush();
-      return false;
-    }
-
-    byte[] clientHash = inStream.readNBytes(hashSize);
-    if (clientHash.length != hashSize) {
-      outStream.writeUTF("NOKATTEST");
-      outStream.flush();
-      return false;
-    }
-
-    Path referenceAppPath = readReferenceAppPath(REFERENCE_APP_ID);
-    if (referenceAppPath == null || !Files.exists(referenceAppPath)) {
-      outStream.writeUTF("NOKATTEST");
-      outStream.flush();
-      return false;
-    }
-
     try {
-      byte[] expectedHash = SecurityUtils.sha256WithNonceAndFile(nonce, referenceAppPath);
-      if (!MessageDigest.isEqual(clientHash, expectedHash)) {
+      return withDecryptedAppFile(() -> {
+        FileIntegraty.verifyIntegrityOrExit(APP_FILE);
+        long nonce = SecurityUtils.generateNonce();
+        outStream.writeLong(nonce);
+        outStream.flush();
+
+        int hashSize = inStream.readInt();
+        if (hashSize != 32) {
+          outStream.writeUTF("NOKATTEST");
+          outStream.flush();
+          return false;
+        }
+
+        byte[] clientHash = inStream.readNBytes(hashSize);
+        if (clientHash.length != hashSize) {
+          outStream.writeUTF("NOKATTEST");
+          outStream.flush();
+          return false;
+        }
+
+        Path referenceAppPath = readReferenceAppPath(REFERENCE_APP_ID);
+        if (referenceAppPath == null || !Files.exists(referenceAppPath)) {
+          outStream.writeUTF("NOKATTEST");
+          outStream.flush();
+          return false;
+        }
+
+        byte[] expectedHash = SecurityUtils.sha256WithNonceAndFile(nonce, referenceAppPath);
+        if (!MessageDigest.isEqual(clientHash, expectedHash)) {
+          outStream.writeUTF("NOKATTEST");
+          outStream.flush();
+          return false;
+        }
+
+        outStream.writeUTF("OKATTEST");
+        outStream.flush();
+        return true;
+      });
+    } catch (Exception e) {
+      try {
         outStream.writeUTF("NOKATTEST");
         outStream.flush();
-        return false;
+      } catch (IOException ioException) {
+        // já estamos a falhar a atestação; não há recuperação útil aqui
       }
-    } catch (Exception e) {
-      outStream.writeUTF("NOKATTEST");
-      outStream.flush();
       return false;
     }
-
-    outStream.writeUTF("OKATTEST");
-    outStream.flush();
-    return true;
   }
 
   /**
@@ -306,20 +316,85 @@ class ServerThread extends Thread {
     }
 
     FileIntegraty.ensureFileAndHashOrExit(APP_FILE);
-    FileIntegraty.verifyIntegrityOrExit(APP_FILE);
 
-    // Migração simples de formato legacy (SpertaClient:<size>) para caminho de jar.
     try {
-      Path appPath = readReferenceAppPath(REFERENCE_APP_ID);
-      if (appPath == null || !Files.exists(appPath)) {
-        try (FileWriter writer = new FileWriter(file, false)) {
-          writer.write(REFERENCE_APP_ID + ":" + DEFAULT_REFERENCE_APP_PATH + System.lineSeparator());
+      withDecryptedAppFile(() -> {
+        FileIntegraty.verifyIntegrityOrExit(APP_FILE);
+
+        // Migração simples de formato legacy (SpertaClient:<size>) para caminho de jar.
+        Path appPath = readReferenceAppPath(REFERENCE_APP_ID);
+        if (appPath == null || !Files.exists(appPath)) {
+          try (FileWriter writer = new FileWriter(file, false)) {
+            writer.write(REFERENCE_APP_ID + ":" + DEFAULT_REFERENCE_APP_PATH + System.lineSeparator());
+          }
+          FileIntegraty.updateHashOrExit(APP_FILE);
         }
-        FileIntegraty.updateHashOrExit(APP_FILE);
-      }
+        return null;
+      });
     } catch (Exception e) {
       FileIntegraty.failIntegrityAndExit();
     }
+  }
+
+  private <T> T withDecryptedAppFile(Callable<T> operation) throws Exception {
+    boolean shouldEncryptOnExit = decryptAppFileIfNeeded();
+    try {
+      T result = operation.call();
+      FileIntegraty.verifyIntegrityOrExit(APP_FILE);
+      return result;
+    } finally {
+      if (shouldEncryptOnExit) {
+        encryptAppFile();
+      }
+    }
+  }
+
+  private boolean decryptAppFileIfNeeded() throws Exception {
+    Path appPath = Paths.get(APP_FILE);
+    byte[] fileData = Files.readAllBytes(appPath);
+    if (fileData.length == 0) {
+      return false;
+    }
+
+    try {
+      Files.write(appPath, decrypt(fileData));
+      return true;
+    } catch (Exception e) {
+      // Compatibilidade com ficheiros legacy em claro: se o conteúdo atual
+      // passar a integridade em claro, migramos para cifrado no fim.
+      return FileIntegraty.checkFileIntegrity(APP_FILE);
+    }
+  }
+
+  private void encryptAppFile() throws Exception {
+    Path appPath = Paths.get(APP_FILE);
+    byte[] plaintext = Files.readAllBytes(appPath);
+    Files.write(appPath, encrypt(plaintext));
+  }
+
+  private byte[] encrypt(byte[] plaintext) throws Exception {
+    Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+    cipher.init(Cipher.ENCRYPT_MODE, this.pbeKey);
+
+    byte[] iv = cipher.getIV();
+    byte[] ciphertext = cipher.doFinal(plaintext);
+    byte[] result = new byte[iv.length + ciphertext.length];
+    System.arraycopy(iv, 0, result, 0, iv.length);
+    System.arraycopy(ciphertext, 0, result, iv.length, ciphertext.length);
+    return result;
+  }
+
+  private byte[] decrypt(byte[] data) throws Exception {
+    if (data.length < 16) {
+      throw new IllegalArgumentException("Encrypted app file is too short");
+    }
+
+    byte[] iv = Arrays.copyOfRange(data, 0, 16);
+    byte[] ciphertext = Arrays.copyOfRange(data, 16, data.length);
+
+    Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
+    cipher.init(Cipher.DECRYPT_MODE, this.pbeKey, new IvParameterSpec(iv));
+    return cipher.doFinal(ciphertext);
   }
 
   private void receiveAndStoreCertificate(String user, ObjectOutputStream outStream, ObjectInputStream inStream)

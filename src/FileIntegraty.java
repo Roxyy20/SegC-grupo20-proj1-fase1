@@ -97,7 +97,8 @@ public class FileIntegraty {
     System.exit(1);
   }
 
-  // Verifica integridade de todos os ficheiros (não .hash) dentro de um diretório.
+  // Verifica integridade de todos os ficheiros (não .hash) dentro de um
+  // diretório.
   public static void verifyDirectoryIntegrityOrExit(String directoryPath) {
     Path dir = Path.of(directoryPath);
     if (!Files.exists(dir)) {

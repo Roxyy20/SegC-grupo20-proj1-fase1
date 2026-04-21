@@ -8,12 +8,9 @@ import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.SecureRandom;
-import java.util.Arrays;
 
-import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.PBEKeySpec;
 import javax.crypto.spec.SecretKeySpec;
 import javax.net.ssl.KeyManagerFactory;
@@ -28,6 +25,8 @@ import javax.net.ssl.SSLServerSocketFactory;
  * @author Alice Correia 61844, Marta Rufino 61778, Franscisco Lima 61864
  */
 public class SpertaServer {
+  private static final String SALT_FILE = "server/server.salt";
+
   /**
    * Ponto de entrada.
    *
@@ -103,34 +102,13 @@ public class SpertaServer {
     return new SecretKeySpec(tmp.getEncoded(), "AES");
   }
 
-  private byte[] encrypt(byte[] plaintext) throws Exception {
-    Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-    cipher.init(Cipher.ENCRYPT_MODE, this.pbeKey);
-
-    byte[] iv = cipher.getIV();
-    byte[] ciphertext = cipher.doFinal(plaintext);
-
-    byte[] result = new byte[iv.length + ciphertext.length];
-    System.arraycopy(iv, 0, result, 0, iv.length);
-    System.arraycopy(ciphertext, 0, result, iv.length, ciphertext.length);
-
-    return result;
-  }
-
-  private byte[] decrypt(byte[] data) throws Exception {
-    byte[] iv = Arrays.copyOfRange(data, 0, 16);
-    byte[] ciphertext = Arrays.copyOfRange(data, 16, data.length);
-
-    Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-    cipher.init(Cipher.DECRYPT_MODE, this.pbeKey, new IvParameterSpec(iv));
-    return cipher.doFinal(ciphertext);
-  }
-
   private static byte[] loadOrCreateSalt() {
-    File saltFile = new File("server/server.salt");
+    File saltFile = new File(SALT_FILE);
 
     if (saltFile.exists()) {
       try {
+        FileIntegraty.ensureFileAndHashOrExit(SALT_FILE);
+        FileIntegraty.verifyIntegrityOrExit(SALT_FILE);
         return Files.readAllBytes(saltFile.toPath());
       } catch (Exception ex) {
         System.err.println("Salt file could not be open");
@@ -144,6 +122,7 @@ public class SpertaServer {
     saltFile.getParentFile().mkdirs();
     try {
       Files.write(saltFile.toPath(), salt);
+      FileIntegraty.updateHashOrExit(SALT_FILE);
     } catch (Exception ex) {
       System.err.println("Could not write salt to file");
     }
