@@ -33,7 +33,6 @@ class ServerThread extends Thread {
   ServerThread(Socket inSoc, String passwordCifra) {
     socket = inSoc;
     this.passwordCifra = passwordCifra;
-    System.out.println("Thread started for new client");
   }
 
   /**
@@ -100,15 +99,12 @@ class ServerThread extends Thread {
       }
       buffReader.close();
       if (found) {
-        System.out.println("Entrou no if found");
         if (!authenticated) {
           // não deve acontecer, mas evitar enviar estado errado
           outStream.writeUTF(LoginMessage.WrongPassword.name());
         } else {
-        System.out.println("Entrou no if authenticated");
         outStream.writeUTF(LoginMessage.OKUser.name());
         outStream.flush();
-        System.out.println("Enviou OKUser");
         }
       } else {
         outStream.writeUTF(LoginMessage.OKNewUser.name());
@@ -138,7 +134,6 @@ class ServerThread extends Thread {
         String cmdStr;
         try {
           cmdStr = inStream.readUTF();
-          System.out.println("Received command: " + cmdStr);
         } catch (IOException e) {
           // client disconnected
           break;

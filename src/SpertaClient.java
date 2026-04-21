@@ -281,9 +281,9 @@ public class SpertaClient {
    */
   private static void receiveCreateResponseAndSendSectionKeys(String home) throws IOException {
     String response = inStream.readUTF();
-    System.out.println(response);
 
     if (!response.equalsIgnoreCase("OK")) {
+      System.out.println(response);
       return;
     }
 
