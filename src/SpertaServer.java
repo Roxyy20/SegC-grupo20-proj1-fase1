@@ -8,6 +8,7 @@ import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.SecureRandom;
+import java.util.stream.Stream;
 
 import javax.crypto.SecretKey;
 import javax.crypto.SecretKeyFactory;
@@ -138,7 +139,7 @@ public class SpertaServer {
       SSLServerSocketFactory factory = buildTlsFactory(keystorePath, passwordKeystore);
       try (SSLServerSocket sSoc = (SSLServerSocket) factory.createServerSocket(port)) {
         sSoc.setNeedClientAuth(false); // autenticação unilateral do servidor
-        FileIntegraty.verifyDirectoryIntegrityOrExit("server");
+        verifyServerStorageOrExit();
         System.out.println("Server Started");
         while (true) {
           try {
@@ -189,5 +190,48 @@ public class SpertaServer {
       throw lastSecurityException;
     }
     throw new GeneralSecurityException("Unable to load keystore.");
+  }
+
+  private void verifyServerStorageOrExit() {
+    Path dir = Path.of("server");
+    if (!Files.exists(dir)) {
+      return;
+    }
+
+    Path sectionKeysDir = dir.resolve("sectionKeys").normalize();
+    Path certsDir = dir.resolve("certs").normalize();
+    Path saltPath = dir.resolve("server.salt").normalize();
+
+    try (Stream<Path> stream = Files.walk(dir)) {
+      stream
+          .filter(Files::isRegularFile)
+          .filter(path -> !path.toString().endsWith(".hash"))
+          .filter(path -> !path.normalize().startsWith(sectionKeysDir))
+          .filter(path -> !path.normalize().startsWith(certsDir))
+          .filter(path -> !path.normalize().equals(saltPath))
+          .forEach(path -> verifyServerFileOrExit(path));
+    } catch (IOException e) {
+      FileIntegraty.failIntegrityAndExit();
+    }
+  }
+
+  private void verifyServerFileOrExit(Path path) {
+    try {
+      if (isProtectedServerFile(path)) {
+        ProtectedFileUtils.withDecryptedFile(path.toString(), pbeKey, () -> null);
+      } else {
+        FileIntegraty.verifyIntegrityOrExit(path.toString());
+      }
+    } catch (Exception e) {
+      FileIntegraty.failIntegrityAndExit();
+    }
+  }
+
+  private boolean isProtectedServerFile(Path path) {
+    String normalizedPath = path.normalize().toString().replace(File.separatorChar, '/');
+    return normalizedPath.equals("server/apps.txt")
+        || normalizedPath.equals("server/homes.txt")
+        || normalizedPath.equals("server/devices.txt")
+        || normalizedPath.endsWith(".csv");
   }
 }

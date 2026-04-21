@@ -11,11 +11,8 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.util.concurrent.Callable;
-import java.util.Arrays;
 
-import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
-import javax.crypto.spec.IvParameterSpec;
 
 /**
  * Thread responsável por tratar uma ligação de cliente: atestação,
@@ -133,7 +130,7 @@ class ServerThread extends Thread {
         receiveAndStoreCertificate(user, outStream, inStream);
       }
 
-      CommandHandler commandHandler = new CommandHandler(user);
+      CommandHandler commandHandler = new CommandHandler(user, pbeKey);
 
       while (true) {
         String cmdStr;
@@ -337,64 +334,7 @@ class ServerThread extends Thread {
   }
 
   private <T> T withDecryptedAppFile(Callable<T> operation) throws Exception {
-    boolean shouldEncryptOnExit = decryptAppFileIfNeeded();
-    try {
-      T result = operation.call();
-      FileIntegraty.verifyIntegrityOrExit(APP_FILE);
-      return result;
-    } finally {
-      if (shouldEncryptOnExit) {
-        encryptAppFile();
-      }
-    }
-  }
-
-  private boolean decryptAppFileIfNeeded() throws Exception {
-    Path appPath = Paths.get(APP_FILE);
-    byte[] fileData = Files.readAllBytes(appPath);
-    if (fileData.length == 0) {
-      return false;
-    }
-
-    try {
-      Files.write(appPath, decrypt(fileData));
-      return true;
-    } catch (Exception e) {
-      // Compatibilidade com ficheiros legacy em claro: se o conteúdo atual
-      // passar a integridade em claro, migramos para cifrado no fim.
-      return FileIntegraty.checkFileIntegrity(APP_FILE);
-    }
-  }
-
-  private void encryptAppFile() throws Exception {
-    Path appPath = Paths.get(APP_FILE);
-    byte[] plaintext = Files.readAllBytes(appPath);
-    Files.write(appPath, encrypt(plaintext));
-  }
-
-  private byte[] encrypt(byte[] plaintext) throws Exception {
-    Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-    cipher.init(Cipher.ENCRYPT_MODE, this.pbeKey);
-
-    byte[] iv = cipher.getIV();
-    byte[] ciphertext = cipher.doFinal(plaintext);
-    byte[] result = new byte[iv.length + ciphertext.length];
-    System.arraycopy(iv, 0, result, 0, iv.length);
-    System.arraycopy(ciphertext, 0, result, iv.length, ciphertext.length);
-    return result;
-  }
-
-  private byte[] decrypt(byte[] data) throws Exception {
-    if (data.length < 16) {
-      throw new IllegalArgumentException("Encrypted app file is too short");
-    }
-
-    byte[] iv = Arrays.copyOfRange(data, 0, 16);
-    byte[] ciphertext = Arrays.copyOfRange(data, 16, data.length);
-
-    Cipher cipher = Cipher.getInstance("AES/CBC/PKCS5Padding");
-    cipher.init(Cipher.DECRYPT_MODE, this.pbeKey, new IvParameterSpec(iv));
-    return cipher.doFinal(ciphertext);
+    return ProtectedFileUtils.withDecryptedFile(APP_FILE, pbeKey, operation);
   }
 
   private void receiveAndStoreCertificate(String user, ObjectOutputStream outStream, ObjectInputStream inStream)

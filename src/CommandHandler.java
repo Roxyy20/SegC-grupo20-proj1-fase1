@@ -13,6 +13,9 @@ import java.util.Base64;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.Callable;
+
+import javax.crypto.SecretKey;
 
 
 /**
@@ -28,13 +31,15 @@ public class CommandHandler {
   private static final String DEVICES_FILE = "server/devices.txt";
   private static final Map<String, Home> homes = new LinkedHashMap<>();
   private final String currentUser;
+  private final SecretKey pbeKey;
   private static final String SECTION_KEYS_DIR = "server/sectionKeys";
 
   /**
    * Associa o handler a um utilizador autenticado.
    */
-  public CommandHandler(String user) {
+  public CommandHandler(String user, SecretKey pbeKey) {
     currentUser = user;
+    this.pbeKey = pbeKey;
   }
 
   // Home
@@ -76,9 +81,16 @@ public class CommandHandler {
       return;
     }
 
-    FileIntegraty.verifyIntegrityOrExit(deviceLogFile.getPath());
     byte[] encryptedSectionKey = Files.readAllBytes(keyFile.toPath());
-    byte[] data = Files.readAllBytes(deviceLogFile.toPath());
+    byte[] data;
+    try {
+      data = withDecryptedProtectedFile(deviceLogFile.getPath(), () -> {
+        FileIntegraty.verifyIntegrityOrExit(deviceLogFile.getPath());
+        return Files.readAllBytes(deviceLogFile.toPath());
+      });
+    } catch (IOException e) {
+      throw e;
+    }
 
     outStream.writeUTF(ServerResponse.OK.name());
     outStream.writeUTF(section);
@@ -117,36 +129,41 @@ public class CommandHandler {
     if (parent != null && !parent.exists()) {
       parent.mkdirs();
     }
-    FileIntegraty.ensureFileAndHashOrExit(DEVICES_FILE);
-    FileIntegraty.verifyIntegrityOrExit(DEVICES_FILE);
-
     Map<String, StringBuilder> dataBySection = new LinkedHashMap<>();
-    boolean hasDataForHome = false;
-    try (BufferedReader reader = new BufferedReader(new FileReader(devicesFile))) {
-      String line;
-      while ((line = reader.readLine()) != null) {
-        if (line.isBlank())
-          continue;
-        String[] parts = line.split(";");
-        if (parts.length < 3)
-          continue;
-        if (!parts[0].equals(homeName))
-          continue;
-        hasDataForHome = true;
-        String device = parts[1];
-        ServerResponse perm = home.canAccessDevice(device, currentUser);
-        if (perm != ServerResponse.OK)
-          continue;
-        String section = deviceSectionCode(device);
-        StringBuilder sectionData = dataBySection.computeIfAbsent(section, key -> new StringBuilder());
-        if (sectionData.length() > 0)
-          sectionData.append(System.lineSeparator());
-        sectionData.append(line);
-      }
+    final boolean[] hasDataForHome = new boolean[1];
+    try {
+      withDecryptedProtectedFile(DEVICES_FILE, () -> {
+        FileIntegraty.verifyIntegrityOrExit(DEVICES_FILE);
+        try (BufferedReader reader = new BufferedReader(new FileReader(devicesFile))) {
+          String line;
+          while ((line = reader.readLine()) != null) {
+            if (line.isBlank())
+              continue;
+            String[] parts = line.split(";");
+            if (parts.length < 3)
+              continue;
+            if (!parts[0].equals(homeName))
+              continue;
+            hasDataForHome[0] = true;
+            String device = parts[1];
+            ServerResponse perm = home.canAccessDevice(device, currentUser);
+            if (perm != ServerResponse.OK)
+              continue;
+            String section = deviceSectionCode(device);
+            StringBuilder sectionData = dataBySection.computeIfAbsent(section, key -> new StringBuilder());
+            if (sectionData.length() > 0)
+              sectionData.append(System.lineSeparator());
+            sectionData.append(line);
+          }
+        }
+        return null;
+      });
+    } catch (IOException e) {
+      throw e;
     }
 
     if (dataBySection.isEmpty()) {
-      if (hasDataForHome) {
+      if (hasDataForHome[0]) {
         outStream.writeUTF(ServerResponse.NOPERM.name());
       } else {
         outStream.writeUTF(ServerResponse.NODATA.name());
@@ -238,18 +255,22 @@ public class CommandHandler {
     if (parent != null && !parent.exists()) {
       parent.mkdirs();
     }
-    FileIntegraty.ensureFileAndHashOrExit(deviceLog.getPath());
-    FileIntegraty.verifyIntegrityOrExit(deviceLog.getPath());
-    try (FileWriter writer = new FileWriter(deviceLog, true)) {
-      Date currentUserData = new Date();
-      String data = new SimpleDateFormat("yyyy-MM-dd").format(currentUserData);
-      String time = new SimpleDateFormat("HH:mm:ss").format(currentUserData);
-      writer.write(String.format("%s,%s,%s,%s", data, time, currentUser, encryptedValueBase64));
-      writer.write(System.lineSeparator());
+    try {
+      withDecryptedProtectedFile(deviceLog.getPath(), () -> {
+        FileIntegraty.verifyIntegrityOrExit(deviceLog.getPath());
+        try (FileWriter writer = new FileWriter(deviceLog, true)) {
+          Date currentUserData = new Date();
+          String data = new SimpleDateFormat("yyyy-MM-dd").format(currentUserData);
+          String time = new SimpleDateFormat("HH:mm:ss").format(currentUserData);
+          writer.write(String.format("%s,%s,%s,%s", data, time, currentUser, encryptedValueBase64));
+          writer.write(System.lineSeparator());
+        }
+        FileIntegraty.updateHashOrExit(deviceLog.getPath());
+        return null;
+      });
     } catch (IOException e) {
-      e.printStackTrace();
+      throw e;
     }
-    FileIntegraty.updateHashOrExit(deviceLog.getPath());
     updateLastStatesFile(homeName, device, encryptedValueBase64, currentUser);
 
     outStream.writeUTF(ServerResponse.OK.name());
@@ -584,21 +605,26 @@ public class CommandHandler {
    * Recarrega o cache das casas a partir do ficheiro. Chamado uma vez no load
    * inicial; se o ficheiro não existir, o cache fica vazio.
    */
-  private static void loadHomesFromDisk() {
+  private void loadHomesFromDisk() throws IOException {
     ensureHomesFile();
-    FileIntegraty.ensureFileAndHashOrExit(HOMES_FILE);
-    FileIntegraty.verifyIntegrityOrExit(HOMES_FILE);
-    homes.clear();
-    homes.putAll(Home.loadHomesFromDisk(HOMES_FILE));
+    withDecryptedProtectedFile(HOMES_FILE, () -> {
+      FileIntegraty.verifyIntegrityOrExit(HOMES_FILE);
+      homes.clear();
+      homes.putAll(Home.loadHomesFromDisk(HOMES_FILE));
+      return null;
+    });
   }
 
   /**
    * Persiste o cache atual para o ficheiro homes.txt de uma só vez.
    */
-  private static void saveHomesToDisk() {
+  private void saveHomesToDisk() throws IOException {
     ensureHomesFile();
-    Home.saveHomesToDisk(homes.values(), HOMES_FILE);
-    FileIntegraty.updateHashOrExit(HOMES_FILE);
+    withDecryptedProtectedFile(HOMES_FILE, () -> {
+      Home.saveHomesToDisk(homes.values(), HOMES_FILE);
+      FileIntegraty.updateHashOrExit(HOMES_FILE);
+      return null;
+    });
   }
 
 
@@ -648,40 +674,54 @@ public class CommandHandler {
     if (parent != null && !parent.exists()) {
       parent.mkdirs();
     }
-    FileIntegraty.ensureFileAndHashOrExit(DEVICES_FILE);
-    FileIntegraty.verifyIntegrityOrExit(DEVICES_FILE);
-
     Map<String, String> latest = new LinkedHashMap<>();
-    if (file.exists()) {
-      try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-        String line;
-        while ((line = reader.readLine()) != null) {
-          if (line.isBlank())
-            continue;
-          String[] parts = line.split(";");
-          if (parts.length < 2)
-            continue;
-          latest.put(parts[0] + ";" + parts[1], line);
+    try {
+      withDecryptedProtectedFile(DEVICES_FILE, () -> {
+        FileIntegraty.verifyIntegrityOrExit(DEVICES_FILE);
+        if (file.exists()) {
+          try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+              if (line.isBlank())
+                continue;
+              String[] parts = line.split(";");
+              if (parts.length < 2)
+                continue;
+              latest.put(parts[0] + ";" + parts[1], line);
+            }
+          }
         }
-      } catch (IOException e) {
-        e.printStackTrace();
-      }
-    }
+        String key = homeName + ";" + device;
+        String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
+        String newLine = String.format("%s;%s;%s;%s;%s", homeName, device, encryptedValue, timestamp, user);
+        latest.put(key, newLine);
 
-    String key = homeName + ";" + device;
-    String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
-    String newLine = String.format("%s;%s;%s;%s;%s", homeName, device, encryptedValue, timestamp, user);
-    latest.put(key, newLine);
-
-    try (FileWriter writer = new FileWriter(file, false)) {
-      for (String line : latest.values()) {
-        writer.write(line);
-        writer.write(System.lineSeparator());
-      }
+        try (FileWriter writer = new FileWriter(file, false)) {
+          for (String line : latest.values()) {
+            writer.write(line);
+            writer.write(System.lineSeparator());
+          }
+        }
+        FileIntegraty.updateHashOrExit(DEVICES_FILE);
+        return null;
+      });
     } catch (IOException e) {
-      e.printStackTrace();
+      throw new RuntimeException(e);
     }
-    FileIntegraty.updateHashOrExit(DEVICES_FILE);
+  }
+
+  private <T> T withDecryptedProtectedFile(String filePath, Callable<T> operation) throws IOException {
+    FileIntegraty.ensureFileAndHashOrExit(filePath);
+    try {
+      return ProtectedFileUtils.withDecryptedFile(filePath, pbeKey, operation);
+    } catch (IOException e) {
+      throw e;
+    } catch (Exception e) {
+      if (e instanceof RuntimeException) {
+        throw (RuntimeException) e;
+      }
+      throw new IOException(e);
+    }
   }
 
 }

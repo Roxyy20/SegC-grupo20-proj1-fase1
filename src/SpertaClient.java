@@ -1,5 +1,4 @@
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
@@ -12,6 +11,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Scanner;
+
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 
@@ -42,102 +42,103 @@ public class SpertaClient {
    *             <user-id> <pass>}
    */
   public static void main(String[] args) {
-      try {
-          if (args.length != 7) {
-              System.err.println("Wrong argument count. Usage: SpertaClient <serverAddress> <truststore> <password-truststore> <keystore> <password-keystore> <user-id> <password>");
-              return;
-          }
-          
-          String[] values = args[0].split(":");
-          
-          String address = values[0];
-          
-          int port = 22345;
-          if (values.length > 1) {
-              try {
-                  port = Integer.parseInt(values[1]);
-              } catch (NumberFormatException e) {
-                  System.out.format("'%s' id not a valid port format. Using default value of 22345\n", values[1]);
-              }
-          }
-          String truststore = args[1];
-          String passwordTruststore = args[2];
-          keystore = args[3];
-          passwordKeystore = args[4];
-          userId = args[5];
-          String password = args[6];
-
-          System.setProperty("javax.net.ssl.trustStore", truststore);
-          System.setProperty("javax.net.ssl.trustStorePassword", passwordTruststore);
-          System.setProperty("javax.net.ssl.keyStore", keystore);
-          System.setProperty("javax.net.ssl.keyStorePassword", passwordKeystore);
-          SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
-          SSLSocket clientSocket = (SSLSocket) factory.createSocket(address, port);
-          System.out.println("Connected");
-          // assign to static fields so other methods can use them
-          outStream = new ObjectOutputStream(clientSocket.getOutputStream());
-          outStream.flush();
-          inStream = new ObjectInputStream(clientSocket.getInputStream());
-          
-          // attestation anti-replay: SHA256(nonce || SpertaClient.jar)
-          long nonce = inStream.readLong();
-          byte[] hash;
-          try {
-            Path clientJarPath = resolveClientJarPath();
-            hash = SecurityUtils.sha256WithNonceAndFile(nonce, clientJarPath);
-          } catch (Exception e) {
-            System.err.println("Erro a calcular atestação: " + e.getMessage());
-            return;
-          }
-
-          outStream.writeInt(hash.length);
-          outStream.write(hash);
-          outStream.flush();
-
-          String attestResp = inStream.readUTF();
-          if ("NOKATTEST".equalsIgnoreCase(attestResp)) {
-              System.out.println("NOKATTEST");
-              return;
-          } else if ("OKATTEST".equalsIgnoreCase(attestResp)) {
-              System.out.println("OKATTEST");
-          } else {
-              System.out.println("Unexpected attestation response: " + attestResp);
-              return;
-          }
-          
-          // send credentials
-          outStream.writeUTF(userId);
-          outStream.writeUTF(password);
-          outStream.flush();
-          
-          LoginMessage msg = LoginMessage.valueOf(inStream.readUTF());
-          switch (msg) {
-              case WrongPassword:
-                  System.out.println("Wrong password");
-                  tryNewPassword();
-                  break;
-              case OKNewUser:
-                  System.out.println("Ok. You are a new user");
-                  sendCertificate(outStream, userId);
-                  System.out.println("Certificate sent");
-                  printhelp();
-                  readCommands();
-                  break;
-              case OKUser:
-                  System.out.println("OK, Welcome back");
-                  printhelp();
-                  readCommands();
-                  break;
-                  
-              default:
-                  break;
-          }
-          // cleanup streams after command loop returns
-          outStream.close();
-          inStream.close();
-      } catch (IOException e) {
-          System.err.println("Error: " + e.getMessage());
+    try {
+      if (args.length != 7) {
+        System.err.println(
+            "Wrong argument count. Usage: SpertaClient <serverAddress> <truststore> <password-truststore> <keystore> <password-keystore> <user-id> <password>");
+        return;
       }
+
+      String[] values = args[0].split(":");
+
+      String address = values[0];
+
+      int port = 22345;
+      if (values.length > 1) {
+        try {
+          port = Integer.parseInt(values[1]);
+        } catch (NumberFormatException e) {
+          System.out.format("'%s' id not a valid port format. Using default value of 22345\n", values[1]);
+        }
+      }
+      String truststore = args[1];
+      String passwordTruststore = args[2];
+      keystore = args[3];
+      passwordKeystore = args[4];
+      userId = args[5];
+      String password = args[6];
+
+      System.setProperty("javax.net.ssl.trustStore", truststore);
+      System.setProperty("javax.net.ssl.trustStorePassword", passwordTruststore);
+      System.setProperty("javax.net.ssl.keyStore", keystore);
+      System.setProperty("javax.net.ssl.keyStorePassword", passwordKeystore);
+      SSLSocketFactory factory = (SSLSocketFactory) SSLSocketFactory.getDefault();
+      SSLSocket clientSocket = (SSLSocket) factory.createSocket(address, port);
+      System.out.println("Connected");
+      // assign to static fields so other methods can use them
+      outStream = new ObjectOutputStream(clientSocket.getOutputStream());
+      outStream.flush();
+      inStream = new ObjectInputStream(clientSocket.getInputStream());
+
+      // attestation anti-replay: SHA256(nonce || SpertaClient.jar)
+      long nonce = inStream.readLong();
+      byte[] hash;
+      try {
+        Path clientJarPath = resolveClientJarPath();
+        hash = SecurityUtils.sha256WithNonceAndFile(nonce, clientJarPath);
+      } catch (Exception e) {
+        System.err.println("Erro a calcular atestação: " + e.getMessage());
+        return;
+      }
+
+      outStream.writeInt(hash.length);
+      outStream.write(hash);
+      outStream.flush();
+
+      String attestResp = inStream.readUTF();
+      if ("NOKATTEST".equalsIgnoreCase(attestResp)) {
+        System.out.println("NOKATTEST");
+        return;
+      } else if ("OKATTEST".equalsIgnoreCase(attestResp)) {
+        System.out.println("OKATTEST");
+      } else {
+        System.out.println("Unexpected attestation response: " + attestResp);
+        return;
+      }
+
+      // send credentials
+      outStream.writeUTF(userId);
+      outStream.writeUTF(password);
+      outStream.flush();
+
+      LoginMessage msg = LoginMessage.valueOf(inStream.readUTF());
+      switch (msg) {
+        case WrongPassword:
+          System.out.println("Wrong password");
+          tryNewPassword();
+          break;
+        case OKNewUser:
+          System.out.println("Ok. You are a new user");
+          sendCertificate(outStream, userId);
+          System.out.println("Certificate sent");
+          printhelp();
+          readCommands();
+          break;
+        case OKUser:
+          System.out.println("OK, Welcome back");
+          printhelp();
+          readCommands();
+          break;
+
+        default:
+          break;
+      }
+      // cleanup streams after command loop returns
+      outStream.close();
+      inStream.close();
+    } catch (IOException e) {
+      System.err.println("Error: " + e.getMessage());
+    }
   }
 
   /**
@@ -197,8 +198,7 @@ public class SpertaClient {
       if (!sent)
         continue; // erro nos argumentos → voltar a pedir comando
 
-      
-      if(mensagem[0].equalsIgnoreCase("CREATE")) {
+      if (mensagem[0].equalsIgnoreCase("CREATE")) {
         receiveCreateResponseAndSendSectionKeys(mensagem[1]);
       } else if (mensagem[0].equalsIgnoreCase("ADD")) {
         receiveAddResponseAndSendSectionKey(mensagem[1], mensagem[2], mensagem[3]);
@@ -275,7 +275,7 @@ public class SpertaClient {
     return true;
   }
 
-   /**
+  /**
    * Trata a resposta ao CREATE. Se a casa for criada com sucesso,
    * gera e envia as chaves de secção cifradas para o owner.
    */
@@ -304,8 +304,7 @@ public class SpertaClient {
     PublicKey ownerPublicKey = CryptoUtils.getPublicKeyFromKeystore(
         keystore,
         passwordKeystore,
-        userId
-    );
+        userId);
 
     outStream.writeInt(Section.values().length);
 
@@ -341,8 +340,7 @@ public class SpertaClient {
           keystore,
           passwordKeystore,
           userId,
-          passwordKeystore
-      );
+          passwordKeystore);
 
       for (String sectionCode : sectionCodesForAdd(section)) {
         byte[] encryptedForOwner = requestOwnerSectionKey(home, sectionCode);
@@ -473,8 +471,7 @@ public class SpertaClient {
           keystore,
           passwordKeystore,
           userId,
-          passwordKeystore
-      );
+          passwordKeystore);
       byte[] sectionKeyBytes = CryptoUtils.decryptRSA(encryptedSectionKey, privateKey);
       javax.crypto.SecretKey sectionKey = CryptoUtils.bytesToAESKey(sectionKeyBytes);
       byte[] encryptedValue = CryptoUtils.encryptAES(CryptoUtils.stringToBytes(value), sectionKey);
@@ -488,8 +485,6 @@ public class SpertaClient {
       throw new IOException("Erro ao cifrar valor EC: " + e.getMessage(), e);
     }
   }
-
-
 
   /**
    * Solicita ao utilizador uma nova password até que corresponda ao valor
@@ -645,8 +640,7 @@ public class SpertaClient {
           keystore,
           passwordKeystore,
           userId,
-          passwordKeystore
-      );
+          passwordKeystore);
       byte[] sectionKeyBytes = CryptoUtils.decryptRSA(encryptedSectionKey, privateKey);
       return CryptoUtils.bytesToAESKey(sectionKeyBytes);
     } catch (Exception e) {
