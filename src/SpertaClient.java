@@ -696,29 +696,19 @@ public class SpertaClient {
 
   private static String decryptRtSectionContent(String encryptedContent, javax.crypto.SecretKey sectionKey)
       throws IOException {
-    StringBuilder plaintext = new StringBuilder();
-    String[] lines = encryptedContent.split("\\R");
-    for (String line : lines) {
-      if (line.isBlank()) {
-        continue;
-      }
-
-      String[] parts = line.split(";", -1);
-      if (parts.length >= 3) {
-        parts[2] = decryptBase64Value(parts[2], sectionKey);
-        line = String.join(";", parts);
-      }
-
-      if (plaintext.length() > 0) {
-        plaintext.append(System.lineSeparator());
-      }
-      plaintext.append(line);
-    }
-    return plaintext.toString();
+    return decryptDelimitedContent(encryptedContent, sectionKey, ";", 2);
   }
 
   private static String decryptRhContent(String encryptedContent, javax.crypto.SecretKey sectionKey)
       throws IOException {
+    return decryptDelimitedContent(encryptedContent, sectionKey, ",", 3);
+  }
+
+  private static String decryptDelimitedContent(
+      String encryptedContent,
+      javax.crypto.SecretKey sectionKey,
+      String delimiter,
+      int encryptedFieldIndex) throws IOException {
     StringBuilder plaintext = new StringBuilder();
     String[] lines = encryptedContent.split("\\R");
     for (String line : lines) {
@@ -726,10 +716,10 @@ public class SpertaClient {
         continue;
       }
 
-      String[] parts = line.split(",", -1);
-      if (parts.length >= 4) {
-        parts[3] = decryptBase64Value(parts[3], sectionKey);
-        line = String.join(",", parts);
+      String[] parts = line.split(java.util.regex.Pattern.quote(delimiter), -1);
+      if (parts.length > encryptedFieldIndex) {
+        parts[encryptedFieldIndex] = decryptBase64Value(parts[encryptedFieldIndex], sectionKey);
+        line = String.join(delimiter, parts);
       }
 
       if (plaintext.length() > 0) {

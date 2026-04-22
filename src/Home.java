@@ -273,7 +273,7 @@ public class Home {
         boolean firstPerm = true;
         for (Map.Entry<String, List<String>> entry : home.permissions.entrySet()) {
           if (firstPerm) {
-            sb.append(hasCounters ? ":" : ":");
+            sb.append(":");
             firstPerm = false;
           } else {
             sb.append(":");

@@ -84,10 +84,7 @@ public class CommandHandler {
     byte[] encryptedSectionKey = Files.readAllBytes(keyFile.toPath());
     byte[] data;
     try {
-      data = withDecryptedProtectedFile(deviceLogFile.getPath(), () -> {
-        FileIntegraty.verifyIntegrityOrExit(deviceLogFile.getPath());
-        return Files.readAllBytes(deviceLogFile.toPath());
-      });
+      data = withDecryptedProtectedFile(deviceLogFile.getPath(), () -> Files.readAllBytes(deviceLogFile.toPath()));
     } catch (IOException e) {
       throw e;
     }
@@ -133,7 +130,6 @@ public class CommandHandler {
     final boolean[] hasDataForHome = new boolean[1];
     try {
       withDecryptedProtectedFile(DEVICES_FILE, () -> {
-        FileIntegraty.verifyIntegrityOrExit(DEVICES_FILE);
         try (BufferedReader reader = new BufferedReader(new FileReader(devicesFile))) {
           String line;
           while ((line = reader.readLine()) != null) {
@@ -257,7 +253,6 @@ public class CommandHandler {
     }
     try {
       withDecryptedProtectedFile(deviceLog.getPath(), () -> {
-        FileIntegraty.verifyIntegrityOrExit(deviceLog.getPath());
         try (FileWriter writer = new FileWriter(deviceLog, true)) {
           Date currentUserData = new Date();
           String data = new SimpleDateFormat("yyyy-MM-dd").format(currentUserData);
@@ -444,7 +439,7 @@ public class CommandHandler {
   /**
    * Verifica se um utilizador está registado no ficheiro de utilizadores.
    */
-  private static Boolean userExists(String user) {
+  private static boolean userExists(String user) {
     File usersFile = new File(USERS_FILE);
     File parent = usersFile.getParentFile();
     if (parent != null && !parent.exists()) {
@@ -472,7 +467,7 @@ public class CommandHandler {
   /**
    * Indica se uma casa existe no cache em memória.
    */
-  public static Boolean findHome(String home) {
+  public static boolean findHome(String home) {
     return getHome(home) != null;
   }
 
@@ -608,7 +603,6 @@ public class CommandHandler {
   private void loadHomesFromDisk() throws IOException {
     ensureHomesFile();
     withDecryptedProtectedFile(HOMES_FILE, () -> {
-      FileIntegraty.verifyIntegrityOrExit(HOMES_FILE);
       homes.clear();
       homes.putAll(Home.loadHomesFromDisk(HOMES_FILE));
       return null;
@@ -677,7 +671,6 @@ public class CommandHandler {
     Map<String, String> latest = new LinkedHashMap<>();
     try {
       withDecryptedProtectedFile(DEVICES_FILE, () -> {
-        FileIntegraty.verifyIntegrityOrExit(DEVICES_FILE);
         if (file.exists()) {
           try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
             String line;
