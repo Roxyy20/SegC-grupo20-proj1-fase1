@@ -52,8 +52,7 @@ public class CommandHandler {
 
     loadHomesFromDisk();
     if (!findHome(homeName)) {
-      outStream.writeUTF(ServerResponse.NOHM.name());
-      outStream.flush();
+      sendResponse(outStream, ServerResponse.NOHM);
       return;
     }
 
@@ -61,33 +60,25 @@ public class CommandHandler {
 
     ServerResponse perm = home.canAccessDevice(device, currentUser);
     if (!ServerResponse.OK.equals(perm)) {
-      outStream.writeUTF(perm.name());
-      outStream.flush();
+      sendResponse(outStream, perm);
       return;
     }
 
     File deviceLogFile = home.requestDeviceLog(device);
     if (!deviceLogFile.exists()) {
-      outStream.writeUTF(ServerResponse.NODATA.name());
-      outStream.flush();
+      sendResponse(outStream, ServerResponse.NODATA);
       return;
     }
 
     String section = deviceSectionCode(device);
     File keyFile = findEncryptedSectionKey(homeName, section, currentUser);
     if (keyFile == null || !keyFile.exists()) {
-      outStream.writeUTF(ServerResponse.NODATA.name());
-      outStream.flush();
+      sendResponse(outStream, ServerResponse.NODATA);
       return;
     }
 
     byte[] encryptedSectionKey = Files.readAllBytes(keyFile.toPath());
-    byte[] data;
-    try {
-      data = withDecryptedProtectedFile(deviceLogFile.getPath(), () -> Files.readAllBytes(deviceLogFile.toPath()));
-    } catch (IOException e) {
-      throw e;
-    }
+    byte[] data = withDecryptedProtectedFile(deviceLogFile.getPath(), () -> Files.readAllBytes(deviceLogFile.toPath()));
 
     outStream.writeUTF(ServerResponse.OK.name());
     outStream.writeUTF(section);
@@ -108,55 +99,46 @@ public class CommandHandler {
 
     loadHomesFromDisk();
     if (!findHome(homeName)) {
-      outStream.writeUTF(ServerResponse.NOHM.name());
-      outStream.flush();
+      sendResponse(outStream, ServerResponse.NOHM);
       return;
     }
     Home home = getHome(homeName);
 
     ServerResponse housePerm = home.canAccessHome(currentUser);
     if (ServerResponse.NOPERM.equals(housePerm)) {
-      outStream.writeUTF(housePerm.name());
-      outStream.flush();
+      sendResponse(outStream, housePerm);
       return;
     }
 
     File devicesFile = new File(DEVICES_FILE);
-    File parent = devicesFile.getParentFile();
-    if (parent != null && !parent.exists()) {
-      parent.mkdirs();
-    }
+    ensureParentDir(devicesFile);
     Map<String, StringBuilder> dataBySection = new LinkedHashMap<>();
     final boolean[] hasDataForHome = new boolean[1];
-    try {
-      withDecryptedProtectedFile(DEVICES_FILE, () -> {
-        try (BufferedReader reader = new BufferedReader(new FileReader(devicesFile))) {
-          String line;
-          while ((line = reader.readLine()) != null) {
-            if (line.isBlank())
-              continue;
-            String[] parts = line.split(";");
-            if (parts.length < 3)
-              continue;
-            if (!parts[0].equals(homeName))
-              continue;
-            hasDataForHome[0] = true;
-            String device = parts[1];
-            ServerResponse perm = home.canAccessDevice(device, currentUser);
-            if (perm != ServerResponse.OK)
-              continue;
-            String section = deviceSectionCode(device);
-            StringBuilder sectionData = dataBySection.computeIfAbsent(section, key -> new StringBuilder());
-            if (sectionData.length() > 0)
-              sectionData.append(System.lineSeparator());
-            sectionData.append(line);
-          }
+    withDecryptedProtectedFile(DEVICES_FILE, () -> {
+      try (BufferedReader reader = new BufferedReader(new FileReader(devicesFile))) {
+        String line;
+        while ((line = reader.readLine()) != null) {
+          if (line.isBlank())
+            continue;
+          String[] parts = line.split(";");
+          if (parts.length < 3)
+            continue;
+          if (!parts[0].equals(homeName))
+            continue;
+          hasDataForHome[0] = true;
+          String device = parts[1];
+          ServerResponse perm = home.canAccessDevice(device, currentUser);
+          if (perm != ServerResponse.OK)
+            continue;
+          String section = deviceSectionCode(device);
+          StringBuilder sectionData = dataBySection.computeIfAbsent(section, key -> new StringBuilder());
+          if (sectionData.length() > 0)
+            sectionData.append(System.lineSeparator());
+          sectionData.append(line);
         }
-        return null;
-      });
-    } catch (IOException e) {
-      throw e;
-    }
+      }
+      return null;
+    });
 
     if (dataBySection.isEmpty()) {
       if (hasDataForHome[0]) {
@@ -168,8 +150,7 @@ public class CommandHandler {
       for (String section : dataBySection.keySet()) {
         File keyFile = findEncryptedSectionKey(homeName, section, currentUser);
         if (keyFile == null || !keyFile.exists()) {
-          outStream.writeUTF(ServerResponse.NODATA.name());
-          outStream.flush();
+          sendResponse(outStream, ServerResponse.NODATA);
           return;
         }
       }
@@ -205,23 +186,20 @@ public class CommandHandler {
 
     loadHomesFromDisk();
     if (!findHome(homeName)) {
-      outStream.writeUTF(ServerResponse.NOHM.name());
-      outStream.flush();
+      sendResponse(outStream, ServerResponse.NOHM);
       return;
     }
     Home home = getHome(homeName);
 
     ServerResponse res = home.canAccessDevice(device, currentUser);
     if (res != ServerResponse.OK) {
-      outStream.writeUTF(res.name());
-      outStream.flush();
+      sendResponse(outStream, res);
       return;
     }
 
     File keyFile = findEncryptedSectionKey(homeName, deviceSectionCode(device), currentUser);
     if (keyFile == null || !keyFile.exists()) {
-      outStream.writeUTF(ServerResponse.NODATA.name());
-      outStream.flush();
+      sendResponse(outStream, ServerResponse.NODATA);
       return;
     }
 
@@ -233,43 +211,33 @@ public class CommandHandler {
 
     int encryptedValueSize = inStream.readInt();
     if (encryptedValueSize <= 0) {
-      outStream.writeUTF(ServerResponse.NOK.name());
-      outStream.flush();
+      sendResponse(outStream, ServerResponse.NOK);
       return;
     }
 
     byte[] encryptedValue = inStream.readNBytes(encryptedValueSize);
     if (encryptedValue.length != encryptedValueSize) {
-      outStream.writeUTF(ServerResponse.NOK.name());
-      outStream.flush();
+      sendResponse(outStream, ServerResponse.NOK);
       return;
     }
 
     String encryptedValueBase64 = Base64.getEncoder().encodeToString(encryptedValue);
     File deviceLog = new File("server/" + homeName + "_" + device + ".csv");
-    File parent = deviceLog.getParentFile();
-    if (parent != null && !parent.exists()) {
-      parent.mkdirs();
-    }
-    try {
-      withDecryptedProtectedFile(deviceLog.getPath(), () -> {
-        try (FileWriter writer = new FileWriter(deviceLog, true)) {
-          Date currentUserData = new Date();
-          String data = new SimpleDateFormat("yyyy-MM-dd").format(currentUserData);
-          String time = new SimpleDateFormat("HH:mm:ss").format(currentUserData);
-          writer.write(String.format("%s,%s,%s,%s", data, time, currentUser, encryptedValueBase64));
-          writer.write(System.lineSeparator());
-        }
-        FileIntegraty.updateHashOrExit(deviceLog.getPath());
-        return null;
-      });
-    } catch (IOException e) {
-      throw e;
-    }
+    ensureParentDir(deviceLog);
+    withDecryptedProtectedFile(deviceLog.getPath(), () -> {
+      try (FileWriter writer = new FileWriter(deviceLog, true)) {
+        Date currentUserData = new Date();
+        String data = new SimpleDateFormat("yyyy-MM-dd").format(currentUserData);
+        String time = new SimpleDateFormat("HH:mm:ss").format(currentUserData);
+        writer.write(String.format("%s,%s,%s,%s", data, time, currentUser, encryptedValueBase64));
+        writer.write(System.lineSeparator());
+      }
+      FileIntegraty.updateHashOrExit(deviceLog.getPath());
+      return null;
+    });
     updateLastStatesFile(homeName, device, encryptedValueBase64, currentUser);
 
-    outStream.writeUTF(ServerResponse.OK.name());
-    outStream.flush();
+    sendResponse(outStream, ServerResponse.OK);
   }
 
   /**
@@ -282,8 +250,7 @@ public class CommandHandler {
 
     loadHomesFromDisk();
     if (!findHome(homeName)) {
-      outStream.writeUTF(ServerResponse.NOHM.name());
-      outStream.flush();
+      sendResponse(outStream, ServerResponse.NOHM);
       return;
     }
     Home home = getHome(homeName);
@@ -291,8 +258,7 @@ public class CommandHandler {
     ServerResponse res = home.registerDevice(sectionCode, currentUser);
     saveHomesToDisk();
 
-    outStream.writeUTF(res.name());
-    outStream.flush();
+    sendResponse(outStream, res);
   }
 
   /**
@@ -304,15 +270,13 @@ public class CommandHandler {
     String permission = inStream.readUTF();
 
     if (!userExists(user)) {
-      outStream.writeUTF(ServerResponse.NOUSER.name());
-      outStream.flush();
+      sendResponse(outStream, ServerResponse.NOUSER);
       return;
     }
 
     loadHomesFromDisk();
     if (!findHome(homeName)) {
-      outStream.writeUTF(ServerResponse.NOHM.name());
-      outStream.flush();
+      sendResponse(outStream, ServerResponse.NOHM);
       return;
     }
     Home home = getHome(homeName);
@@ -322,8 +286,7 @@ public class CommandHandler {
 
     // System.out.println("Usuario " + user + " adicionado com permissão " +
     // permission + " à " + home);
-    outStream.writeUTF(res.name());
-    outStream.flush();
+    sendResponse(outStream, res);
   }
 
   /**
@@ -333,15 +296,13 @@ public class CommandHandler {
       throws IOException {
     String user = inStream.readUTF();
     if (!userExists(user)) {
-      outStream.writeUTF(ServerResponse.NOUSER.name());
-      outStream.flush();
+      sendResponse(outStream, ServerResponse.NOUSER);
       return;
     }
 
     File certFile = new File("server/certs", user + ".cert");
     if (!certFile.exists()) {
-      outStream.writeUTF(ServerResponse.NODATA.name());
-      outStream.flush();
+      sendResponse(outStream, ServerResponse.NODATA);
       return;
     }
 
@@ -362,22 +323,19 @@ public class CommandHandler {
 
     loadHomesFromDisk();
     if (!findHome(homeName)) {
-      outStream.writeUTF(ServerResponse.NOHM.name());
-      outStream.flush();
+      sendResponse(outStream, ServerResponse.NOHM);
       return;
     }
 
     Home home = getHome(homeName);
     if (!home.owner.equals(currentUser)) {
-      outStream.writeUTF(ServerResponse.NOPERM.name());
-      outStream.flush();
+      sendResponse(outStream, ServerResponse.NOPERM);
       return;
     }
 
     File keyFile = findEncryptedSectionKey(homeName, section, currentUser);
     if (keyFile == null || !keyFile.exists()) {
-      outStream.writeUTF(ServerResponse.NODATA.name());
-      outStream.flush();
+      sendResponse(outStream, ServerResponse.NODATA);
       return;
     }
 
@@ -399,41 +357,35 @@ public class CommandHandler {
     int keySize = inStream.readInt();
 
     if (keySize <= 0) {
-      outStream.writeUTF(ServerResponse.NOK.name());
-      outStream.flush();
+      sendResponse(outStream, ServerResponse.NOK);
       return;
     }
 
     byte[] encryptedKey = inStream.readNBytes(keySize);
     if (encryptedKey.length != keySize) {
-      outStream.writeUTF(ServerResponse.NOK.name());
-      outStream.flush();
+      sendResponse(outStream, ServerResponse.NOK);
       return;
     }
 
     if (!userExists(user)) {
-      outStream.writeUTF(ServerResponse.NOUSER.name());
-      outStream.flush();
+      sendResponse(outStream, ServerResponse.NOUSER);
       return;
     }
 
     loadHomesFromDisk();
     if (!findHome(homeName)) {
-      outStream.writeUTF(ServerResponse.NOHM.name());
-      outStream.flush();
+      sendResponse(outStream, ServerResponse.NOHM);
       return;
     }
 
     Home home = getHome(homeName);
     if (!home.owner.equals(currentUser)) {
-      outStream.writeUTF(ServerResponse.NOPERM.name());
-      outStream.flush();
+      sendResponse(outStream, ServerResponse.NOPERM);
       return;
     }
 
     storeEncryptedSectionKey(homeName, section, user, encryptedKey);
-    outStream.writeUTF(ServerResponse.OK.name());
-    outStream.flush();
+    sendResponse(outStream, ServerResponse.OK);
   }
 
   /**
@@ -441,10 +393,7 @@ public class CommandHandler {
    */
   private static boolean userExists(String user) {
     File usersFile = new File(USERS_FILE);
-    File parent = usersFile.getParentFile();
-    if (parent != null && !parent.exists()) {
-      parent.mkdirs();
-    }
+    ensureParentDir(usersFile);
     FileIntegraty.ensureFileAndHashOrExit(USERS_FILE);
     FileIntegraty.verifyIntegrityOrExit(USERS_FILE);
     try (BufferedReader reader = new BufferedReader(new FileReader(usersFile))) {
@@ -477,8 +426,7 @@ public class CommandHandler {
   public void createHome(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
     String name = inStream.readUTF().trim();
     if (name.isBlank()) {
-      outStream.writeUTF(ServerResponse.NOK.name());
-      outStream.flush();
+      sendResponse(outStream, ServerResponse.NOK);
       return;
     }
 
@@ -486,8 +434,7 @@ public class CommandHandler {
     String key = name;
     if (homes.containsKey(key)) {
       System.out.println("Home '" + name + "' already exists.");
-      outStream.writeUTF(ServerResponse.NOK.name());
-      outStream.flush();
+      sendResponse(outStream, ServerResponse.NOK);
       return;
     }
 
@@ -497,8 +444,7 @@ public class CommandHandler {
     saveHomesToDisk();
 
     System.out.println("Creating home '" + name + "'");
-    outStream.writeUTF(ServerResponse.OK.name());
-    outStream.flush();
+    sendResponse(outStream, ServerResponse.OK);
 
     try {
       receiveAndStoreSectionKeysForCreate(inStream, name, currentUser);
@@ -639,10 +585,7 @@ public class CommandHandler {
    */
   private static void ensureHomesFile() {
     File homesFile = new File(HOMES_FILE);
-    File parent = homesFile.getParentFile();
-    if (parent != null && !parent.exists()) {
-      parent.mkdirs();
-    }
+    ensureParentDir(homesFile);
 
     if (homesFile.exists()) {
       return;
@@ -664,10 +607,7 @@ public class CommandHandler {
    */
   private void updateLastStatesFile(String homeName, String device, String encryptedValue, String user) {
     File file = new File(DEVICES_FILE);
-    File parent = file.getParentFile();
-    if (parent != null && !parent.exists()) {
-      parent.mkdirs();
-    }
+    ensureParentDir(file);
     Map<String, String> latest = new LinkedHashMap<>();
     try {
       withDecryptedProtectedFile(DEVICES_FILE, () -> {
@@ -707,13 +647,26 @@ public class CommandHandler {
     FileIntegraty.ensureFileAndHashOrExit(filePath);
     try {
       return ProtectedFileUtils.withDecryptedFile(filePath, pbeKey, operation);
-    } catch (IOException e) {
-      throw e;
     } catch (Exception e) {
+      if (e instanceof IOException) {
+        throw (IOException) e;
+      }
       if (e instanceof RuntimeException) {
         throw (RuntimeException) e;
       }
       throw new IOException(e);
+    }
+  }
+
+  private static void sendResponse(ObjectOutputStream outStream, ServerResponse response) throws IOException {
+    outStream.writeUTF(response.name());
+    outStream.flush();
+  }
+
+  private static void ensureParentDir(File file) {
+    File parent = file.getParentFile();
+    if (parent != null && !parent.exists()) {
+      parent.mkdirs();
     }
   }
 

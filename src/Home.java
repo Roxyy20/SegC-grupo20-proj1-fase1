@@ -66,10 +66,7 @@ public class Home {
    */
   public File requestDeviceLog(String device) {
     File deviceLogFile = new File("server/" + name + "_" + device + ".csv");
-    File parent = deviceLogFile.getParentFile();
-    if (parent != null && !parent.exists()) {
-      parent.mkdirs();
-    }
+    ensureParentDir(deviceLogFile);
     return deviceLogFile;
   }
 
@@ -257,10 +254,7 @@ public class Home {
    */
   public synchronized static void saveHomesToDisk(Collection<Home> homes, String filename) {
     File homesFile = new File(filename);
-    File parent = homesFile.getParentFile();
-    if (parent != null && !parent.exists()) {
-      parent.mkdirs();
-    }
+    ensureParentDir(homesFile);
     try (FileWriter writer = new FileWriter(homesFile, false)) {
       for (Home home : homes) {
         StringBuilder sb = new StringBuilder();
@@ -319,5 +313,12 @@ public class Home {
       e.printStackTrace();
     }
     return homes;
+  }
+
+  private static void ensureParentDir(File file) {
+    File parent = file.getParentFile();
+    if (parent != null && !parent.exists()) {
+      parent.mkdirs();
+    }
   }
 }

@@ -116,10 +116,7 @@ class ServerThread extends Thread {
         String saltBase64 = SecurityUtils.toBase64(salt);
 
         File usersFile = new File(USERS_FILE);
-        File parent = usersFile.getParentFile();
-        if (parent != null && !parent.exists()) {
-          parent.mkdirs();
-        }
+        ensureParentDir(usersFile);
         try (FileWriter fileWriter = new FileWriter(usersFile, true)) {
           fileWriter.write(user + ":" + hashBase64 + ":" + saltBase64 + "\n");
         } catch (IOException e) {
@@ -297,10 +294,7 @@ class ServerThread extends Thread {
    */
   private void ensureAppFile() {
     File file = new File(APP_FILE);
-    File parent = file.getParentFile();
-    if (parent != null && !parent.exists()) {
-      parent.mkdirs();
-    }
+    ensureParentDir(file);
 
     // migrate legacy location if needed
     File legacy = new File("apps.txt");
@@ -357,5 +351,12 @@ class ServerThread extends Thread {
 
     File certFile = new File(certDir, user + ".cert");
     Files.write(certFile.toPath(), certBytes);
+  }
+
+  private static void ensureParentDir(File file) {
+    File parent = file.getParentFile();
+    if (parent != null && !parent.exists()) {
+      parent.mkdirs();
+    }
   }
 }

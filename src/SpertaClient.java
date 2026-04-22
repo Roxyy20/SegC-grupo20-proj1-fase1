@@ -583,10 +583,7 @@ public class SpertaClient {
       }
 
       File outputFile = new File("client/devices_" + home + "_recebido.txt");
-      File parent = outputFile.getParentFile();
-      if (parent != null && !parent.exists()) {
-        parent.mkdirs();
-      }
+      ensureParentDir(outputFile);
       Files.write(outputFile.toPath(), CryptoUtils.stringToBytes(plaintext.toString()));
 
       // Mostrar conteúdo recebido no terminal
@@ -626,10 +623,7 @@ public class SpertaClient {
 
       // Abrir ficheiro para gravar
       File outputFile = new File("client/" + home + "_" + device + "_log.csv");
-      File parent = outputFile.getParentFile();
-      if (parent != null && !parent.exists()) {
-        parent.mkdirs();
-      }
+      ensureParentDir(outputFile);
       Files.write(outputFile.toPath(), CryptoUtils.stringToBytes(decryptedContent));
 
       System.out.println("Conteúdo recebido:");
@@ -748,5 +742,12 @@ public class SpertaClient {
     outStream.writeLong(certBytes.length);
     outStream.write(certBytes);
     outStream.flush();
+  }
+
+  private static void ensureParentDir(File file) {
+    File parent = file.getParentFile();
+    if (parent != null && !parent.exists()) {
+      parent.mkdirs();
+    }
   }
 }
