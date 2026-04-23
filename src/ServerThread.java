@@ -21,7 +21,7 @@ import javax.crypto.SecretKey;
  */
 class ServerThread extends Thread {
   private Socket socket = null;
-  private SecretKey pbeKey;
+  private final SecretKey pbeKey;
   private static final String APP_FILE = "server/apps.txt";
   private static final String USERS_FILE = "server/users.txt";
   private static final String REFERENCE_APP_ID = "SpertaClient";
