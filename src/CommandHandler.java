@@ -46,7 +46,7 @@ public class CommandHandler {
   /**
    * Envia para o cliente o log CSV de um dispositivo, validando permissões.
    */
-  public void requestDeviceLog(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
+  public synchronized void requestDeviceLog(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
     String homeName = inStream.readUTF();
     String device = inStream.readUTF();
 
@@ -94,7 +94,7 @@ public class CommandHandler {
    * Envia para o cliente os últimos estados/temporizações dos dispositivos da
    * casa a que o utilizador tem acesso.
    */
-  public void requestHomeLog(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
+  public synchronized void requestHomeLog(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
     String homeName = inStream.readUTF();
 
     loadHomesFromDisk();
@@ -423,7 +423,7 @@ public class CommandHandler {
   /**
    * Cria uma nova casa e associa o utilizador atual como owner.
    */
-  public void createHome(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
+  public synchronized void createHome(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
     String name = inStream.readUTF().trim();
     if (name.isBlank()) {
       sendResponse(outStream, ServerResponse.NOK);
