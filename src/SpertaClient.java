@@ -2,6 +2,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.net.ConnectException;
+import java.net.InetAddress;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -140,9 +142,34 @@ public class SpertaClient {
       // cleanup streams after command loop returns
       outStream.close();
       inStream.close();
+    } catch (ConnectException e) {
+      System.err.println(buildConnectionErrorMessage(args[0], e));
     } catch (IOException e) {
       System.err.println("Error: " + e.getMessage());
     }
+  }
+
+  private static String buildConnectionErrorMessage(String serverAddress, IOException exception) {
+    StringBuilder message = new StringBuilder("Error: " + exception.getMessage());
+
+    String host = serverAddress;
+    int separatorIndex = serverAddress.lastIndexOf(':');
+    if (separatorIndex > 0) {
+      host = serverAddress.substring(0, separatorIndex);
+    }
+
+    try {
+      if (InetAddress.getByName(host).isLoopbackAddress()) {
+        message.append(System.lineSeparator())
+            .append("The address ")
+            .append(host)
+            .append(" is loopback. Use the server machine's LAN IP instead when connecting from another computer.");
+      }
+    } catch (IOException ignored) {
+      // Keep the original error message if the host cannot be resolved locally.
+    }
+
+    return message.toString();
   }
 
   /**

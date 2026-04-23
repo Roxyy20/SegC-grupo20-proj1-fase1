@@ -1,6 +1,10 @@
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.Inet4Address;
+import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
 import java.net.Socket;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -8,6 +12,9 @@ import java.nio.file.Paths;
 import java.security.GeneralSecurityException;
 import java.security.KeyStore;
 import java.security.SecureRandom;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.stream.Stream;
 
 import javax.crypto.SecretKey;
@@ -141,6 +148,7 @@ public class SpertaServer {
         sSoc.setNeedClientAuth(false); // autenticação unilateral do servidor
         verifyServerStorageOrExit();
         System.out.println("Server Started");
+        printReachableAddresses();
         while (true) {
           try {
             Socket inSoc = sSoc.accept();
@@ -236,5 +244,36 @@ public class SpertaServer {
         || normalizedPath.equals("server/homes.txt")
         || normalizedPath.equals("server/devices.txt")
         || normalizedPath.endsWith(".csv");
+  }
+
+  private void printReachableAddresses() {
+    List<String> addresses = new ArrayList<>();
+
+    try {
+      for (NetworkInterface networkInterface : Collections.list(NetworkInterface.getNetworkInterfaces())) {
+        if (!networkInterface.isUp() || networkInterface.isLoopback()) {
+          continue;
+        }
+
+        for (InetAddress address : Collections.list(networkInterface.getInetAddresses())) {
+          if (address instanceof Inet4Address && !address.isLoopbackAddress()) {
+            addresses.add(address.getHostAddress());
+          }
+        }
+      }
+    } catch (SocketException e) {
+      System.out.println("Could not determine local network addresses automatically.");
+      return;
+    }
+
+    if (addresses.isEmpty()) {
+      System.out.println("No non-loopback IPv4 addresses detected. Remote clients may not be able to connect.");
+      return;
+    }
+
+    System.out.println("Remote clients should connect to one of these addresses:");
+    for (String address : addresses) {
+      System.out.format("- %s:%d%n", address, port);
+    }
   }
 }
