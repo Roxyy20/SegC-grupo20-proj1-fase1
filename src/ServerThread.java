@@ -217,28 +217,28 @@ class ServerThread extends Thread {
 
         int hashSize = inStream.readInt();
         if (hashSize != 32) {
-          outStream.writeUTF("NOKATTEST");
+          outStream.writeUTF("HASHSIZE != 32");
           outStream.flush();
           return false;
         }
 
         byte[] clientHash = inStream.readNBytes(hashSize);
         if (clientHash.length != hashSize) {
-          outStream.writeUTF("NOKATTEST");
+          outStream.writeUTF("CLIENTHASH != HASHSIZE");
           outStream.flush();
           return false;
         }
 
         Path referenceAppPath = readReferenceAppPath(REFERENCE_APP_ID);
         if (referenceAppPath == null || !Files.exists(referenceAppPath)) {
-          outStream.writeUTF("NOKATTEST");
+          outStream.writeUTF("REFERENCE PAHT NOT FOUND");
           outStream.flush();
           return false;
         }
 
         byte[] expectedHash = SecurityUtils.sha256WithNonceAndFile(nonce, referenceAppPath);
         if (!MessageDigest.isEqual(clientHash, expectedHash)) {
-          outStream.writeUTF("NOKATTEST");
+          outStream.writeUTF("HASH MISMATCH");
           outStream.flush();
           return false;
         }
