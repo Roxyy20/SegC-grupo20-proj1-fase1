@@ -93,6 +93,13 @@ public class SpertaServer {
     this.passwordKeystore = passwordKeystore;
   }
 
+  /**
+   * Deriva chave AES a partir de password com PBKDF2.
+   *
+   * @param password password base
+   * @param salt salt persistente
+   * @return chave simétrica derivada
+   */
   private static SecretKey deriveKey(String password, byte[] salt) {
     PBEKeySpec pbeSpec = new PBEKeySpec(
         password.toCharArray(),
@@ -110,6 +117,11 @@ public class SpertaServer {
     return new SecretKeySpec(tmp.getEncoded(), "AES");
   }
 
+  /**
+   * Carrega o salt do servidor ou cria um novo quando não existe.
+   *
+   * @return bytes do salt
+   */
   private static byte[] loadOrCreateSalt() {
     File saltFile = new File(SALT_FILE);
 
@@ -166,6 +178,15 @@ public class SpertaServer {
     }
   }
 
+  /**
+   * Constrói a factory TLS do servidor com a keystore configurada.
+   *
+   * @param keyStorePath caminho da keystore
+   * @param keyStorePassword password da keystore/chave privada
+   * @return factory de sockets TLS para o servidor
+   * @throws IOException se ocorrer erro de I/O
+   * @throws GeneralSecurityException se ocorrer erro criptográfico
+   */
   private SSLServerSocketFactory buildTlsFactory(String keyStorePath, String keyStorePassword)
       throws IOException, GeneralSecurityException {
     KeyStore keyStore = loadKeyStore(keyStorePath, keyStorePassword);
@@ -178,6 +199,15 @@ public class SpertaServer {
     return context.getServerSocketFactory();
   }
 
+  /**
+   * Carrega uma keystore tentando tipos comuns (default, JKS e PKCS12).
+   *
+   * @param keyStorePath caminho da keystore
+   * @param keyStorePassword password da keystore
+   * @return keystore carregada
+   * @throws IOException se ocorrer erro de leitura
+   * @throws GeneralSecurityException se não for possível abrir com nenhum tipo
+   */
   private KeyStore loadKeyStore(String keyStorePath, String keyStorePassword)
       throws IOException, GeneralSecurityException {
     Path path = Paths.get(keyStorePath);
@@ -200,6 +230,10 @@ public class SpertaServer {
     throw new GeneralSecurityException("Unable to load keystore.");
   }
 
+  /**
+   * Verifica integridade dos ficheiros persistentes do servidor e termina em
+   * falha.
+   */
   private void verifyServerStorageOrExit() {
     Path dir = Path.of("server");
     if (!Files.exists(dir)) {
@@ -226,6 +260,11 @@ public class SpertaServer {
     }
   }
 
+  /**
+   * Verifica um ficheiro do servidor, tratando ficheiros protegidos e simples.
+   *
+   * @param path caminho do ficheiro
+   */
   private void verifyServerFileOrExit(Path path) {
     try {
       if (isProtectedServerFile(path)) {
@@ -238,6 +277,12 @@ public class SpertaServer {
     }
   }
 
+  /**
+   * Indica se o ficheiro é protegido por cifragem no servidor.
+   *
+   * @param path caminho do ficheiro
+   * @return {@code true} se for ficheiro protegido
+   */
   private boolean isProtectedServerFile(Path path) {
     String normalizedPath = path.normalize().toString().replace(File.separatorChar, '/');
     return normalizedPath.equals("server/apps.txt")
@@ -246,6 +291,9 @@ public class SpertaServer {
         || normalizedPath.endsWith(".csv");
   }
 
+  /**
+   * Mostra no arranque os endereços IPv4 locais para ligação remota de clientes.
+   */
   private void printReachableAddresses() {
     List<String> addresses = new ArrayList<>();
 

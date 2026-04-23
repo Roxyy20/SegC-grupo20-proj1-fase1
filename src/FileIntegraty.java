@@ -5,8 +5,17 @@ import java.security.MessageDigest;
 import java.util.Base64;
 import java.util.stream.Stream;
 
+/**
+ * Utilitários de integridade de ficheiros baseados em SHA-256 com ficheiros
+ * auxiliares {@code .hash}.
+ */
 public class FileIntegraty {
-  // Calcula e guarda o hash SHA-256 do ficheiro.
+  /**
+   * Calcula e guarda o hash SHA-256 de um ficheiro em {@code <ficheiro>.hash}.
+   *
+   * @param filePath caminho do ficheiro alvo
+   * @throws Exception se ocorrer erro de leitura, hashing ou escrita
+   */
   public static void updateFileHash(String filePath) throws Exception {
     Path path = Path.of(filePath);
     byte[] data = Files.readAllBytes(path);
@@ -16,7 +25,13 @@ public class FileIntegraty {
     Files.writeString(Path.of(filePath + ".hash"), hashString);
   }
 
-  // Verifica se o hash do ficheiro bate certo.
+  /**
+   * Verifica a integridade de um ficheiro comparando-o com o seu {@code .hash}.
+   *
+   * @param filePath caminho do ficheiro alvo
+   * @return {@code true} se a integridade for válida, {@code false} caso
+   *         contrário
+   */
   public static boolean checkFileIntegrity(String filePath) {
     try {
       Path path = Path.of(filePath);
@@ -35,7 +50,12 @@ public class FileIntegraty {
     }
   }
 
-  // Garante existência do ficheiro e do respetivo .hash (bootstrap/migração).
+  /**
+   * Garante que o ficheiro e o respetivo {@code .hash} existem.
+   *
+   * @param filePath caminho do ficheiro alvo
+   * @throws Exception se existir ficheiro sem hash, ou se falhar a criação
+   */
   public static void ensureFileAndHash(String filePath) throws Exception {
     Path path = Path.of(filePath);
     Path parent = path.getParent();
@@ -58,14 +78,23 @@ public class FileIntegraty {
     }
   }
 
-  // Verifica integridade; lança exceção em caso de falha.
+  /**
+   * Valida a integridade e lança exceção em caso de falha.
+   *
+   * @param filePath caminho do ficheiro alvo
+   * @throws Exception se a integridade falhar
+   */
   public static void assertIntegrity(String filePath) throws Exception {
     if (!checkFileIntegrity(filePath)) {
       throw new IllegalStateException("Integrity check failed: " + filePath);
     }
   }
 
-  // Garante ficheiro e hash; em falha termina com NOK-INTEGRITY.
+  /**
+   * Garante existência de ficheiro e hash; termina o processo em caso de falha.
+   *
+   * @param filePath caminho do ficheiro alvo
+   */
   public static void ensureFileAndHashOrExit(String filePath) {
     try {
       ensureFileAndHash(filePath);
@@ -74,7 +103,11 @@ public class FileIntegraty {
     }
   }
 
-  // Verifica integridade; em falha termina com NOK-INTEGRITY.
+  /**
+   * Verifica integridade; termina o processo em caso de falha.
+   *
+   * @param filePath caminho do ficheiro alvo
+   */
   public static void verifyIntegrityOrExit(String filePath) {
     try {
       assertIntegrity(filePath);
@@ -83,7 +116,11 @@ public class FileIntegraty {
     }
   }
 
-  // Atualiza hash após escrita; em falha termina com NOK-INTEGRITY.
+  /**
+   * Atualiza o hash do ficheiro; termina o processo em caso de falha.
+   *
+   * @param filePath caminho do ficheiro alvo
+   */
   public static void updateHashOrExit(String filePath) {
     try {
       updateFileHash(filePath);
@@ -92,13 +129,21 @@ public class FileIntegraty {
     }
   }
 
+  /**
+   * Escreve {@code NOK-INTEGRITY} e termina imediatamente o processo.
+   */
   public static void failIntegrityAndExit() {
     System.err.println("NOK-INTEGRITY");
     System.exit(1);
   }
 
-  // Verifica integridade de todos os ficheiros (não .hash) dentro de um
-  // diretório.
+  /**
+   * Verifica integridade de todos os ficheiros regulares de um diretório,
+   * excluindo ficheiros {@code .hash}, {@code server/sectionKeys} e
+   * {@code server/certs}.
+   *
+   * @param directoryPath caminho da diretoria a verificar
+   */
   public static void verifyDirectoryIntegrityOrExit(String directoryPath) {
     Path dir = Path.of(directoryPath);
     if (!Files.exists(dir)) {

@@ -11,7 +11,6 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.MessageDigest;
 import java.util.concurrent.Callable;
-
 import javax.crypto.SecretKey;
 
 /**
@@ -217,28 +216,28 @@ class ServerThread extends Thread {
 
         int hashSize = inStream.readInt();
         if (hashSize != 32) {
-          outStream.writeUTF("HASHSIZE != 32");
+          outStream.writeUTF("NOKATTEST");
           outStream.flush();
           return false;
         }
 
         byte[] clientHash = inStream.readNBytes(hashSize);
         if (clientHash.length != hashSize) {
-          outStream.writeUTF("CLIENTHASH != HASHSIZE");
+          outStream.writeUTF("NOKATTEST");
           outStream.flush();
           return false;
         }
 
         Path referenceAppPath = readReferenceAppPath(REFERENCE_APP_ID);
         if (referenceAppPath == null || !Files.exists(referenceAppPath)) {
-          outStream.writeUTF("REFERENCE PAHT NOT FOUND");
+          outStream.writeUTF("NOKATTEST");
           outStream.flush();
           return false;
         }
 
         byte[] expectedHash = SecurityUtils.sha256WithNonceAndFile(nonce, referenceAppPath);
         if (!MessageDigest.isEqual(clientHash, expectedHash)) {
-          outStream.writeUTF("HASH MISMATCH");
+          outStream.writeUTF("NOKATTEST");
           outStream.flush();
           return false;
         }
@@ -327,10 +326,26 @@ class ServerThread extends Thread {
     }
   }
 
+  /**
+   * Executa operação sobre o ficheiro de apps com descifra/recifra protegida.
+   *
+   * @param <T> tipo de retorno da operação
+   * @param operation operação a executar
+   * @return resultado devolvido pela operação
+   * @throws Exception se ocorrer erro durante o acesso protegido
+   */
   private <T> T withDecryptedAppFile(Callable<T> operation) throws Exception {
     return ProtectedFileUtils.withDecryptedFile(APP_FILE, pbeKey, operation);
   }
 
+  /**
+   * Recebe e guarda o certificado de um utilizador no diretório do servidor.
+   *
+   * @param user utilizador dono do certificado
+   * @param outStream stream de saída para eventuais respostas
+   * @param inStream stream de entrada com os bytes do certificado
+   * @throws IOException se o payload for inválido ou incompleto
+   */
   private void receiveAndStoreCertificate(String user, ObjectOutputStream outStream, ObjectInputStream inStream)
       throws IOException {
 
@@ -353,6 +368,11 @@ class ServerThread extends Thread {
     Files.write(certFile.toPath(), certBytes);
   }
 
+  /**
+   * Garante que a diretoria-mãe do ficheiro existe.
+   *
+   * @param file ficheiro alvo
+   */
   private static void ensureParentDir(File file) {
     File parent = file.getParentFile();
     if (parent != null && !parent.exists()) {

@@ -315,6 +315,11 @@ public class Home {
     return homes;
   }
 
+  /**
+   * Garante que a diretoria-mãe do ficheiro existe antes de escrever.
+   *
+   * @param file ficheiro alvo
+   */
   private static void ensureParentDir(File file) {
     File parent = file.getParentFile();
     if (parent != null && !parent.exists()) {

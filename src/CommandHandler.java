@@ -457,6 +457,15 @@ public class CommandHandler {
     outStream.flush();
   }
 
+  /**
+   * Guarda no disco uma chave de secção cifrada para um utilizador.
+   *
+   * @param homeName nome da casa
+   * @param section secção lógica (W/K/L/B ou nome equivalente)
+   * @param owner utilizador a quem a chave pertence
+   * @param encryptedKey bytes da chave já cifrada
+   * @throws IOException se ocorrer erro de escrita
+   */
   private void storeEncryptedSectionKey(String homeName, String section, String owner, byte[] encryptedKey)
       throws IOException {
 
@@ -471,6 +480,13 @@ public class CommandHandler {
 
   }
 
+  /**
+   * Converte identificador de secção para o código de um carácter usado em disco.
+   *
+   * @param section identificador textual da secção
+   * @return código curto da secção
+   * @throws IOException se o identificador for inválido
+   */
   private String sectionKeyCode(String section) throws IOException {
     Section parsedSection = Section.parseSection(section);
     if (parsedSection == null) {
@@ -479,6 +495,15 @@ public class CommandHandler {
     return String.valueOf(parsedSection.name().charAt(0));
   }
 
+  /**
+   * Localiza no disco a chave cifrada de uma secção para um utilizador.
+   *
+   * @param homeName casa alvo
+   * @param section secção pedida
+   * @param user utilizador dono da chave
+   * @return ficheiro da chave cifrada, ou {@code null} se não existir
+   * @throws IOException se ocorrer erro de validação de secção
+   */
   private File findEncryptedSectionKey(String homeName, String section, String user) throws IOException {
     Section parsedSection = Section.parseSection(section);
     if (parsedSection == null) {
@@ -499,6 +524,13 @@ public class CommandHandler {
     return null;
   }
 
+  /**
+   * Extrai o código de secção a partir do identificador do dispositivo.
+   *
+   * @param device identificador do dispositivo
+   * @return primeira letra maiúscula do dispositivo
+   * @throws IOException se o identificador for inválido
+   */
   private String deviceSectionCode(String device) throws IOException {
     if (device == null || device.isBlank()) {
       throw new IOException("Invalid device identifier");
@@ -506,6 +538,15 @@ public class CommandHandler {
     return String.valueOf(Character.toUpperCase(device.charAt(0)));
   }
 
+  /**
+   * Recebe do cliente as chaves de secção iniciais de uma casa recém-criada e
+   * persiste cada uma em disco.
+   *
+   * @param inStream stream de entrada do cliente
+   * @param homeName casa criada
+   * @param owner owner da casa
+   * @throws IOException se o payload recebido for inválido ou incompleto
+   */
   private void receiveAndStoreSectionKeysForCreate(ObjectInputStream inStream, String homeName, String owner)
       throws IOException {
 
@@ -643,6 +684,16 @@ public class CommandHandler {
     }
   }
 
+  /**
+   * Executa uma operação sobre um ficheiro protegido do servidor com gestão de
+   * integridade e cifragem.
+   *
+   * @param <T> tipo de retorno da operação
+   * @param filePath caminho do ficheiro protegido
+   * @param operation operação a executar
+   * @return resultado da operação
+   * @throws IOException se ocorrer erro durante a operação protegida
+   */
   private <T> T withDecryptedProtectedFile(String filePath, Callable<T> operation) throws IOException {
     FileIntegraty.ensureFileAndHashOrExit(filePath);
     try {
@@ -658,11 +709,23 @@ public class CommandHandler {
     }
   }
 
+  /**
+   * Envia resposta simples ao cliente e força flush da stream.
+   *
+   * @param outStream stream de saída
+   * @param response resposta a enviar
+   * @throws IOException se falhar a escrita
+   */
   private static void sendResponse(ObjectOutputStream outStream, ServerResponse response) throws IOException {
     outStream.writeUTF(response.name());
     outStream.flush();
   }
 
+  /**
+   * Garante que a diretoria-mãe de um ficheiro existe.
+   *
+   * @param file ficheiro alvo
+   */
   private static void ensureParentDir(File file) {
     File parent = file.getParentFile();
     if (parent != null && !parent.exists()) {

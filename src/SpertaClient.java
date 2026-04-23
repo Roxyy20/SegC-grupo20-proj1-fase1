@@ -149,6 +149,14 @@ public class SpertaClient {
     }
   }
 
+  /**
+   * Constrói mensagem de erro de ligação e acrescenta dica para endereços
+   * loopback quando aplicável.
+   *
+   * @param serverAddress endereço usado na ligação
+   * @param exception exceção de ligação capturada
+   * @return mensagem de erro detalhada para apresentar ao utilizador
+   */
   private static String buildConnectionErrorMessage(String serverAddress, IOException exception) {
     StringBuilder message = new StringBuilder("Error: " + exception.getMessage());
 
@@ -390,6 +398,14 @@ public class SpertaClient {
     }
   }
 
+  /**
+   * Converte o argumento da secção do comando {@code ADD} para códigos de secção
+   * efetivos.
+   *
+   * @param section secção pedida (ou {@code all})
+   * @return lista de códigos curtos de secção
+   * @throws IOException se a secção for inválida
+   */
   private static List<String> sectionCodesForAdd(String section) throws IOException {
     List<String> sectionCodes = new ArrayList<>();
     if (section.equalsIgnoreCase("all")) {
@@ -407,6 +423,14 @@ public class SpertaClient {
     return sectionCodes;
   }
 
+  /**
+   * Garante que o certificado de um utilizador existe localmente, pedindo ao
+   * servidor quando necessário.
+   *
+   * @param targetUser utilizador alvo
+   * @return caminho do certificado local do utilizador
+   * @throws IOException se a transferência do certificado falhar
+   */
   private static Path ensureUserCertificate(String targetUser) throws IOException {
     Path certPath = Paths.get("userCerts", targetUser + ".cert");
     if (Files.exists(certPath)) {
@@ -442,6 +466,13 @@ public class SpertaClient {
     return certPath;
   }
 
+  /**
+   * Insere/atualiza certificado de utilizador na truststore local do cliente.
+   *
+   * @param certPath caminho do ficheiro de certificado
+   * @param targetUser utilizador associado ao certificado
+   * @throws IOException se ocorrer erro a carregar ou guardar a truststore
+   */
   private static void ensureCertificateInTruststore(Path certPath, String targetUser) throws IOException {
     try {
       Certificate certificate = CryptoUtils.readCertificate(certPath);
@@ -469,6 +500,14 @@ public class SpertaClient {
     }
   }
 
+  /**
+   * Solicita ao servidor a chave de secção cifrada para o owner atual.
+   *
+   * @param home casa alvo
+   * @param section secção alvo
+   * @return bytes da chave cifrada
+   * @throws IOException se a resposta do servidor for inválida
+   */
   private static byte[] requestOwnerSectionKey(String home, String section) throws IOException {
     outStream.writeUTF(Command.GETKEY.name());
     outStream.writeUTF(home);
@@ -492,6 +531,16 @@ public class SpertaClient {
     return encryptedKey;
   }
 
+  /**
+   * Envia para o servidor uma chave de secção cifrada para um utilizador.
+   *
+   * @param targetUser utilizador de destino
+   * @param home casa alvo
+   * @param section secção alvo
+   * @param encryptedKey chave cifrada para guardar no servidor
+   * @return resposta textual do servidor
+   * @throws IOException se falhar a comunicação
+   */
   private static String storeSectionKeyForUser(String targetUser, String home, String section, byte[] encryptedKey)
       throws IOException {
     outStream.writeUTF(Command.STOREKEY.name());
@@ -678,6 +727,13 @@ public class SpertaClient {
     }
   }
 
+  /**
+   * Lê da stream uma chave de secção cifrada, decifra-a com a chave privada do
+   * utilizador e devolve a chave AES.
+   *
+   * @return chave AES da secção
+   * @throws IOException se os dados recebidos forem inválidos
+   */
   private static javax.crypto.SecretKey readSectionKey() throws IOException {
     int keySize = inStream.readInt();
     if (keySize <= 0) {
@@ -702,6 +758,12 @@ public class SpertaClient {
     }
   }
 
+  /**
+   * Lê da stream um bloco de bytes precedido pelo tamanho (long).
+   *
+   * @return bytes lidos
+   * @throws IOException se o tamanho for inválido ou a leitura incompleta
+   */
   private static byte[] readByteBlock() throws IOException {
     long dataSize = inStream.readLong();
     if (dataSize < 0 || dataSize > Integer.MAX_VALUE) {
@@ -715,16 +777,43 @@ public class SpertaClient {
     return data;
   }
 
+  /**
+   * Decifra conteúdo da resposta {@code RT} linha a linha.
+   *
+   * @param encryptedContent conteúdo cifrado no formato de estado de dispositivos
+   * @param sectionKey chave de secção
+   * @return conteúdo em claro
+   * @throws IOException se falhar a decifragem
+   */
   private static String decryptRtSectionContent(String encryptedContent, javax.crypto.SecretKey sectionKey)
       throws IOException {
     return decryptDelimitedContent(encryptedContent, sectionKey, ";", 2);
   }
 
+  /**
+   * Decifra conteúdo da resposta {@code RH} linha a linha.
+   *
+   * @param encryptedContent conteúdo cifrado no formato de histórico CSV
+   * @param sectionKey chave de secção
+   * @return conteúdo em claro
+   * @throws IOException se falhar a decifragem
+   */
   private static String decryptRhContent(String encryptedContent, javax.crypto.SecretKey sectionKey)
       throws IOException {
     return decryptDelimitedContent(encryptedContent, sectionKey, ",", 3);
   }
 
+  /**
+   * Decifra um campo Base64 cifrado em cada linha delimitada e reconstrói o
+   * conteúdo em claro.
+   *
+   * @param encryptedContent conteúdo completo por linhas
+   * @param sectionKey chave de secção para decifragem
+   * @param delimiter delimitador de colunas
+   * @param encryptedFieldIndex índice do campo cifrado
+   * @return conteúdo em claro
+   * @throws IOException se ocorrer erro de decifragem
+   */
   private static String decryptDelimitedContent(
       String encryptedContent,
       javax.crypto.SecretKey sectionKey,
@@ -751,6 +840,14 @@ public class SpertaClient {
     return plaintext.toString();
   }
 
+  /**
+   * Decifra um valor individual codificado em Base64.
+   *
+   * @param encryptedValueBase64 valor cifrado codificado em Base64
+   * @param sectionKey chave AES de secção
+   * @return valor em texto limpo
+   * @throws IOException se a decifragem falhar
+   */
   private static String decryptBase64Value(String encryptedValueBase64, javax.crypto.SecretKey sectionKey)
       throws IOException {
     try {
@@ -762,6 +859,13 @@ public class SpertaClient {
     }
   }
 
+  /**
+   * Envia o certificado local do utilizador para o servidor.
+   *
+   * @param outStream stream de saída para o servidor
+   * @param user utilizador cujo certificado será enviado
+   * @throws IOException se ocorrer erro de leitura/escrita
+   */
   private static void sendCertificate(ObjectOutputStream outStream, String user) throws IOException {
     Path certPath = Paths.get("userCerts", user + ".cert");
     byte[] certBytes = Files.readAllBytes(certPath);
@@ -771,6 +875,11 @@ public class SpertaClient {
     outStream.flush();
   }
 
+  /**
+   * Garante que a diretoria-mãe de um ficheiro existe.
+   *
+   * @param file ficheiro alvo
+   */
   private static void ensureParentDir(File file) {
     File parent = file.getParentFile();
     if (parent != null && !parent.exists()) {

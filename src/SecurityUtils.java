@@ -8,26 +8,45 @@ import java.security.MessageDigest;
 import java.security.SecureRandom;
 import java.util.Base64;
 
+/**
+ * Utilitários de segurança para hashing, salting e atestação com nonce.
+ */
 public class SecurityUtils {
 
     private static final int SALT_SIZE = 16;
     private static final int FILE_BUFFER_SIZE = 4096;
 
-    // Gera um salt aleatório de tamanho definido por SALT_SIZE16 bytes.
+    /**
+     * Gera um salt aleatório com o tamanho configurado.
+     *
+     * @return bytes aleatórios do salt
+     */
     public static byte[] generateSalt() {
         byte[] salt = new byte[SALT_SIZE];
         new SecureRandom().nextBytes(salt);
         return salt;
     }
 
-    // Calcula o hash SHA-256 de um array de bytes.
+    /**
+     * Calcula o SHA-256 de um bloco de dados.
+     *
+     * @param data dados de entrada
+     * @return digest SHA-256
+     * @throws Exception se o algoritmo não estiver disponível
+     */
     public static byte[] sha256(byte[] data) throws Exception {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         return digest.digest(data); // Retorna o hash calculado
     }
 
-    // Combina a senha com o salt, calcula o hash SHA-256 do resultado e retorna o
-    // hash codificado em Base64.
+    /**
+     * Combina password e salt, aplica SHA-256 e devolve o resultado em Base64.
+     *
+     * @param password password em texto limpo
+     * @param salt salt a combinar
+     * @return hash da password em Base64
+     * @throws Exception se falhar o cálculo do hash
+     */
     public static String hashPasswordWithSalt(String password, byte[] salt) throws Exception {
         byte[] passBytes = password.getBytes(StandardCharsets.UTF_8); // Converte a senha para bytes usando UTF-8
         byte[] combined = new byte[passBytes.length + salt.length]; // Cria um array para armazenar a combinação da
@@ -43,23 +62,43 @@ public class SecurityUtils {
         return Base64.getEncoder().encodeToString(hash);
     }
 
-    // Codifica um array de bytes em uma string Base64.
+    /**
+     * Codifica um array de bytes em Base64.
+     *
+     * @param data bytes a codificar
+     * @return string Base64
+     */
     public static String toBase64(byte[] data) {
         return Base64.getEncoder().encodeToString(data);
     }
 
-    // Decodifica uma string Base64 de volta para um array de bytes.
+    /**
+     * Descodifica uma string Base64 para bytes.
+     *
+     * @param value conteúdo Base64
+     * @return bytes descodificados
+     */
     public static byte[] fromBase64(String value) {
         return Base64.getDecoder().decode(value);
     }
 
-    // Gera nonce aleatório de 8 bytes (long) para atestação anti-replay.
+    /**
+     * Gera nonce aleatório de 8 bytes para atestação anti-replay.
+     *
+     * @return nonce aleatório
+     */
     public static long generateNonce() {
         return new SecureRandom().nextLong();
     }
 
-    // Calcula SHA-256(nonce || bytes do ficheiro), processando o ficheiro por
-    // streaming.
+    /**
+     * Calcula {@code SHA-256(nonce || ficheiro)} por streaming.
+     *
+     * @param nonce nonce de sessão
+     * @param filePath caminho do ficheiro a incluir no hash
+     * @return digest SHA-256 calculado
+     * @throws Exception se ocorrer erro de leitura ou hashing
+     */
     public static byte[] sha256WithNonceAndFile(long nonce, Path filePath) throws Exception {
         MessageDigest digest = MessageDigest.getInstance("SHA-256");
         digest.update(ByteBuffer.allocate(Long.BYTES).putLong(nonce).array());

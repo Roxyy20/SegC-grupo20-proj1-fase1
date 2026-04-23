@@ -17,6 +17,9 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 
+/**
+ * Funções utilitárias de criptografia para AES, RSA, certificados e keystores.
+ */
 public class CryptoUtils {
     private static final String AES_ALGORITHM = "AES";
     private static final String AES_TRANSFORMATION = "AES";
@@ -25,6 +28,9 @@ public class CryptoUtils {
     private static final String RSA_TRANSFORMATION = "RSA";
     private static final String KEYSTORE_TYPE = "PKCS12";
 
+    /**
+     * Construtor privado para classe utilitária estática.
+     */
     private CryptoUtils() {
         // utility class
     }
@@ -193,10 +199,22 @@ public class CryptoUtils {
     // BASE64
     // =========================================================
 
+    /**
+     * Codifica bytes em Base64.
+     *
+     * @param data bytes de entrada
+     * @return representação Base64
+     */
     public static String toBase64(byte[] data) {
         return Base64.getEncoder().encodeToString(data);
     }
 
+    /**
+     * Descodifica Base64 para bytes.
+     *
+     * @param value texto Base64
+     * @return bytes descodificados
+     */
     public static byte[] fromBase64(String value) {
         return Base64.getDecoder().decode(value);
     }
@@ -205,10 +223,22 @@ public class CryptoUtils {
     // STRINGS / BYTES
     // =========================================================
 
+    /**
+     * Converte string UTF-8 para bytes.
+     *
+     * @param value texto de entrada
+     * @return bytes UTF-8
+     */
     public static byte[] stringToBytes(String value) {
         return value.getBytes(StandardCharsets.UTF_8);
     }
 
+    /**
+     * Converte bytes UTF-8 para string.
+     *
+     * @param data bytes de entrada
+     * @return texto descodificado em UTF-8
+     */
     public static String bytesToString(byte[] data) {
         return new String(data, StandardCharsets.UTF_8);
     }

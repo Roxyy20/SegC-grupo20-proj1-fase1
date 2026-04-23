@@ -33,9 +33,6 @@ Projeto 1 - Segurança e Confiabilidade (Fase 2)
 4) Integridade no servidor
 - Existe um `<file>.hash` para os ficheiros de dados do servidor.
 - Em falha de integridade, o servidor termina com `NOK-INTEGRITY`.
-- Nesta implementação, a verificação global de integridade exclui:
-  - `server/certs/`
-  - `server/sectionKeys/`
 
 5) Entrega (zip final)
 - Nome do ficheiro: `SegC-grupoXX-proj1-fase2.zip` (XX = número do grupo).
