@@ -15,7 +15,6 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Scanner;
-
 import javax.net.ssl.SSLSocket;
 import javax.net.ssl.SSLSocketFactory;
 
@@ -73,6 +72,7 @@ public class SpertaClient {
       passwordKeystore = args[4];
       userId = args[5];
       String password = args[6];
+      truststorePath = Paths.get("userCerts/", userId + ".truststore").normalize().toString();
 
       System.setProperty("javax.net.ssl.trustStore", truststorePath);
       System.setProperty("javax.net.ssl.trustStorePassword", passwordTruststore);

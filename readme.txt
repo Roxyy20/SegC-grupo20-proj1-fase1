@@ -13,6 +13,8 @@ Projeto 1 - Segurança e Confiabilidade (Fase 2)
   `./SpertaClient.sh <serverAddress> <truststore> <password-truststore> <keystore> <password-keystore> <user-id> <password>`
   - `serverAddress` no formato `<IP/hostname>[:port]`.
   - Se `:port` não for indicado, usa 22345.
+  - `<truststore>` é por utilizador: `userCerts/<user-id>.truststore`.
+  - Para criar truststore de um utilizador: `keytool -importcert -alias server -file server.cer -keystore userCerts/<user-id>.truststore -storetype PKCS12 -storepass <password-truststore> -noprompt`.
 
 3) Estrutura de ficheiros
 - `src/` — código-fonte Java.
@@ -44,7 +46,7 @@ Projeto 1 - Segurança e Confiabilidade (Fase 2)
   - Este `readme.txt`.
   - Um ficheiro de passwords (ex.: `passwords.txt`) com:
     - password da keystore do servidor;
-    - password da truststore do cliente;
+    - passwords das truststores dos clientes;
     - passwords das keystores dos utilizadores;
     - password-cifra usada no arranque do servidor;
     - utilizadores/passwords de login necessários para demonstração.
