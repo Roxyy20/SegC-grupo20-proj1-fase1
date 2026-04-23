@@ -5,9 +5,9 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
-import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.Base64;
 import java.util.Date;
@@ -16,7 +16,6 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 
 import javax.crypto.SecretKey;
-
 
 /**
  * Trata comandos recebidos de um cliente autenticado, garantindo validações de
@@ -46,7 +45,8 @@ public class CommandHandler {
   /**
    * Envia para o cliente o log CSV de um dispositivo, validando permissões.
    */
-  public synchronized void requestDeviceLog(ObjectOutputStream outStream, ObjectInputStream inStream) throws IOException {
+  public synchronized void requestDeviceLog(ObjectOutputStream outStream, ObjectInputStream inStream)
+      throws IOException {
     String homeName = inStream.readUTF();
     String device = inStream.readUTF();
 
@@ -78,7 +78,7 @@ public class CommandHandler {
     }
 
     byte[] encryptedSectionKey = Files.readAllBytes(keyFile.toPath());
-    byte[] data = withDecryptedProtectedFile(deviceLogFile.getPath(), () -> Files.readAllBytes(deviceLogFile.toPath()));
+    byte[] data = Files.readAllBytes(deviceLogFile.toPath());
 
     outStream.writeUTF(ServerResponse.OK.name());
     outStream.writeUTF(section);
@@ -114,31 +114,28 @@ public class CommandHandler {
     ensureParentDir(devicesFile);
     Map<String, StringBuilder> dataBySection = new LinkedHashMap<>();
     final boolean[] hasDataForHome = new boolean[1];
-    withDecryptedProtectedFile(DEVICES_FILE, () -> {
-      try (BufferedReader reader = new BufferedReader(new FileReader(devicesFile))) {
-        String line;
-        while ((line = reader.readLine()) != null) {
-          if (line.isBlank())
-            continue;
-          String[] parts = line.split(";");
-          if (parts.length < 3)
-            continue;
-          if (!parts[0].equals(homeName))
-            continue;
-          hasDataForHome[0] = true;
-          String device = parts[1];
-          ServerResponse perm = home.canAccessDevice(device, currentUser);
-          if (perm != ServerResponse.OK)
-            continue;
-          String section = deviceSectionCode(device);
-          StringBuilder sectionData = dataBySection.computeIfAbsent(section, key -> new StringBuilder());
-          if (sectionData.length() > 0)
-            sectionData.append(System.lineSeparator());
-          sectionData.append(line);
-        }
+    try (BufferedReader reader = new BufferedReader(new FileReader(devicesFile))) {
+      String line;
+      while ((line = reader.readLine()) != null) {
+        if (line.isBlank())
+          continue;
+        String[] parts = line.split(";");
+        if (parts.length < 3)
+          continue;
+        if (!parts[0].equals(homeName))
+          continue;
+        hasDataForHome[0] = true;
+        String device = parts[1];
+        ServerResponse perm = home.canAccessDevice(device, currentUser);
+        if (perm != ServerResponse.OK)
+          continue;
+        String section = deviceSectionCode(device);
+        StringBuilder sectionData = dataBySection.computeIfAbsent(section, key -> new StringBuilder());
+        if (sectionData.length() > 0)
+          sectionData.append(System.lineSeparator());
+        sectionData.append(line);
       }
-      return null;
-    });
+    }
 
     if (dataBySection.isEmpty()) {
       if (hasDataForHome[0]) {
@@ -224,17 +221,14 @@ public class CommandHandler {
     String encryptedValueBase64 = Base64.getEncoder().encodeToString(encryptedValue);
     File deviceLog = new File("server/" + homeName + "_" + device + ".csv");
     ensureParentDir(deviceLog);
-    withDecryptedProtectedFile(deviceLog.getPath(), () -> {
-      try (FileWriter writer = new FileWriter(deviceLog, true)) {
-        Date currentUserData = new Date();
-        String data = new SimpleDateFormat("yyyy-MM-dd").format(currentUserData);
-        String time = new SimpleDateFormat("HH:mm:ss").format(currentUserData);
-        writer.write(String.format("%s,%s,%s,%s", data, time, currentUser, encryptedValueBase64));
-        writer.write(System.lineSeparator());
-      }
-      FileIntegraty.updateHashOrExit(deviceLog.getPath());
-      return null;
-    });
+    try (FileWriter writer = new FileWriter(deviceLog, true)) {
+      Date currentUserData = new Date();
+      String data = new SimpleDateFormat("yyyy-MM-dd").format(currentUserData);
+      String time = new SimpleDateFormat("HH:mm:ss").format(currentUserData);
+      writer.write(String.format("%s,%s,%s,%s", data, time, currentUser, encryptedValueBase64));
+      writer.write(System.lineSeparator());
+    }
+    FileIntegraty.updateHashOrExit(deviceLog.getPath());
     updateLastStatesFile(homeName, device, encryptedValueBase64, currentUser);
 
     sendResponse(outStream, ServerResponse.OK);
@@ -314,7 +308,8 @@ public class CommandHandler {
   }
 
   /**
-   * Envia ao owner a chave da secção cifrada com a chave pública do próprio owner.
+   * Envia ao owner a chave da secção cifrada com a chave pública do próprio
+   * owner.
    */
   public synchronized void requestOwnerSectionKey(ObjectOutputStream outStream, ObjectInputStream inStream)
       throws IOException {
@@ -347,7 +342,8 @@ public class CommandHandler {
   }
 
   /**
-   * Guarda a chave de secção recebida do owner, cifrada com a chave pública do utilizador alvo.
+   * Guarda a chave de secção recebida do owner, cifrada com a chave pública do
+   * utilizador alvo.
    */
   public synchronized void storeSectionKeyForUser(ObjectOutputStream outStream, ObjectInputStream inStream)
       throws IOException {
@@ -509,30 +505,30 @@ public class CommandHandler {
   private void receiveAndStoreSectionKeysForCreate(ObjectInputStream inStream, String homeName, String owner)
       throws IOException {
 
-  int sectionCount = inStream.readInt();
-  if (sectionCount <= 0) {
-    throw new IOException("Invalid number of sections received");
+    int sectionCount = inStream.readInt();
+    if (sectionCount <= 0) {
+      throw new IOException("Invalid number of sections received");
+    }
+
+    for (int i = 0; i < sectionCount; i++) {
+      String section = inStream.readUTF().trim();
+      if (section.isBlank()) {
+        throw new IOException("Invalid section identifier");
+      }
+
+      int keySize = inStream.readInt();
+      if (keySize <= 0) {
+        throw new IOException("Invalid encrypted section key size");
+      }
+
+      byte[] encryptedKey = inStream.readNBytes(keySize);
+      if (encryptedKey.length != keySize) {
+        throw new IOException("Incomplete encrypted section key received");
+      }
+
+      storeEncryptedSectionKey(homeName, section, owner, encryptedKey);
+    }
   }
-
-  for (int i = 0; i < sectionCount; i++) {
-    String section = inStream.readUTF().trim();
-    if (section.isBlank()) {
-      throw new IOException("Invalid section identifier");
-    }
-
-    int keySize = inStream.readInt();
-    if (keySize <= 0) {
-      throw new IOException("Invalid encrypted section key size");
-    }
-
-    byte[] encryptedKey = inStream.readNBytes(keySize);
-    if (encryptedKey.length != keySize) {
-      throw new IOException("Incomplete encrypted section key received");
-    }
-
-    storeEncryptedSectionKey(homeName, section, owner, encryptedKey);
-  }
-}
 
   /**
    * Devolve o owner associado a uma casa.
@@ -566,7 +562,6 @@ public class CommandHandler {
       return null;
     });
   }
-
 
   /**
    * Obtém uma casa do cache, ignorando maiúsculas/minúsculas.
@@ -610,34 +605,31 @@ public class CommandHandler {
     ensureParentDir(file);
     Map<String, String> latest = new LinkedHashMap<>();
     try {
-      withDecryptedProtectedFile(DEVICES_FILE, () -> {
-        if (file.exists()) {
-          try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-              if (line.isBlank())
-                continue;
-              String[] parts = line.split(";");
-              if (parts.length < 2)
-                continue;
-              latest.put(parts[0] + ";" + parts[1], line);
-            }
+      if (file.exists()) {
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+          String line;
+          while ((line = reader.readLine()) != null) {
+            if (line.isBlank())
+              continue;
+            String[] parts = line.split(";");
+            if (parts.length < 2)
+              continue;
+            latest.put(parts[0] + ";" + parts[1], line);
           }
         }
-        String key = homeName + ";" + device;
-        String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
-        String newLine = String.format("%s;%s;%s;%s;%s", homeName, device, encryptedValue, timestamp, user);
-        latest.put(key, newLine);
+      }
+      String key = homeName + ";" + device;
+      String timestamp = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
+      String newLine = String.format("%s;%s;%s;%s;%s", homeName, device, encryptedValue, timestamp, user);
+      latest.put(key, newLine);
 
-        try (FileWriter writer = new FileWriter(file, false)) {
-          for (String line : latest.values()) {
-            writer.write(line);
-            writer.write(System.lineSeparator());
-          }
+      try (FileWriter writer = new FileWriter(file, false)) {
+        for (String line : latest.values()) {
+          writer.write(line);
+          writer.write(System.lineSeparator());
         }
-        FileIntegraty.updateHashOrExit(DEVICES_FILE);
-        return null;
-      });
+      }
+      FileIntegraty.updateHashOrExit(DEVICES_FILE);
     } catch (IOException e) {
       throw new RuntimeException(e);
     }
