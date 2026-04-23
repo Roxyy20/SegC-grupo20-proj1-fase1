@@ -286,9 +286,7 @@ public class SpertaServer {
   private boolean isProtectedServerFile(Path path) {
     String normalizedPath = path.normalize().toString().replace(File.separatorChar, '/');
     return normalizedPath.equals("server/apps.txt")
-        || normalizedPath.equals("server/homes.txt")
-        || normalizedPath.equals("server/devices.txt")
-        || normalizedPath.endsWith(".csv");
+        || normalizedPath.equals("server/homes.txt");
   }
 
   /**
